@@ -6,7 +6,6 @@ import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 
 // ─── 定数 ────────────────────────────────────────────────────────────────────
 
@@ -16,20 +15,6 @@ const DEPARTMENT_LABELS: Record<string, string> = {
   slitter: "スリッター",
   drone: "ドローン",
   admin: "管理",
-};
-
-const REPORT_STATUS_LABEL: Record<string, string> = {
-  draft: "下書き",
-  submitted: "提出済み",
-  approved: "提出済み",
-  rejected: "提出済み",
-};
-
-const REPORT_STATUS_CLASS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  submitted: "bg-blue-100 text-blue-800",
-  approved: "bg-blue-100 text-blue-800",
-  rejected: "bg-blue-100 text-blue-800",
 };
 
 const DEPARTMENT_CLASS: Record<string, string> = {
@@ -88,61 +73,34 @@ export default function Home() {
 
   // ─── クエリ ────────────────────────────────────────────────────────────────
 
-  const { data: recentReports } = trpc.reports.list.useQuery({ myOnly: true, limit: 5 });
-
   const { data: todayAttendance, refetch: refetchToday } =
     trpc.attendance.today.useQuery();
 
   const { data: activeMembers, refetch: refetchActiveMembers } =
     trpc.attendance.activeMembers.useQuery();
 
-  const todayStr = useMemo(() => today.toISOString().split("T")[0], []);
-
-  const weekStart = useMemo(() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - d.getDay());
-    return d.toISOString().split("T")[0];
-  }, []);
-
-  const weekEnd = useMemo(() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + (6 - d.getDay()));
-    return d.toISOString().split("T")[0];
-  }, []);
-
-  const { data: weekSchedules } = trpc.schedules.list.useQuery({
-    startAt: weekStart,
-    endAt: weekEnd,
-  });
-
-  const todaySchedules = useMemo(
-    () =>
-      weekSchedules
-        ? weekSchedules.filter((s) => {
-            const start = new Date(s.startAt).toISOString().split("T")[0];
-            const end = new Date(s.endAt).toISOString().split("T")[0];
-            return start <= todayStr && end >= todayStr;
-          })
-        : [],
-    [weekSchedules, todayStr]
-  );
-
   const { data: sharedReports } = trpc.reports.sharedAndOrders.useQuery({ limit: 20 });
-  const { data: submissionStatus } = trpc.reports.todaySubmissionStatus.useQuery();
-
-  const yesterdayLabel = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const w = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
-    return `${m}/${day}（${w}）`;
-  }, []);
+  const { data: yesterdaySubmissionStatus } =
+    trpc.reports.yesterdaySubmissionStatus.useQuery();
 
   const sharedInfoReports = useMemo(
     () => (sharedReports ?? []).filter(({ report }) => report.sharedInfo?.trim()),
     [sharedReports]
   );
+  const previewSharedInfo = useMemo(() => sharedInfoReports.slice(0, 5), [sharedInfoReports]);
+
+  const yesterdayLabel = useMemo(() => {
+    const value = yesterdaySubmissionStatus?.targetDate;
+    const base = value ? new Date(`${value}T00:00:00`) : (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return d;
+    })();
+    const m = base.getMonth() + 1;
+    const day = base.getDate();
+    const w = ["日", "月", "火", "水", "木", "金", "土"][base.getDay()];
+    return `${m}/${day}（${w}）`;
+  }, [yesterdaySubmissionStatus?.targetDate]);
 
   // ─── 勤怠状態 ──────────────────────────────────────────────────────────────
 
@@ -219,6 +177,24 @@ export default function Home() {
   const formatTime = (ts?: Date | string | null) => {
     if (!ts) return "--:--";
     return new Date(ts).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const getActiveClockInTime = (m: {
+    attendance?: {
+      clockIn?: Date | string | null;
+      clockOut?: Date | string | null;
+      clockIn2?: Date | string | null;
+      clockOut2?: Date | string | null;
+      clockIn3?: Date | string | null;
+      clockOut3?: Date | string | null;
+    } | null;
+  }) => {
+    const a = m.attendance;
+    if (!a) return null;
+    if (a.clockIn3 && !a.clockOut3) return a.clockIn3;
+    if (a.clockIn2 && !a.clockOut2) return a.clockIn2;
+    if (a.clockIn && !a.clockOut) return a.clockIn;
+    return null;
   };
 
   const statusLabel =
@@ -328,6 +304,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               {activeMembers.map((m) => {
                 if (!m.user) return null;
+                const activeClockIn = getActiveClockInTime(m);
                 return (
                   <div
                     key={m.user.id}
@@ -346,6 +323,11 @@ export default function Home() {
                         {DEPARTMENT_LABELS[m.user.department] ?? m.user.department}
                       </span>
                     )}
+                    {activeClockIn && (
+                      <span className="text-xs text-muted-foreground">
+                        出勤 {formatTime(activeClockIn)}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -354,43 +336,143 @@ export default function Home() {
         </Card>
       )}
 
-      {/* 最近の日報 */}
-      {recentReports && recentReports.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">最近の日報</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {recentReports.map(({ report }) => (
-                <div
+      {/* クイック導線 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Button size="lg" className="h-12" onClick={() => navigate("/reports/new")}>
+          日報を作成
+        </Button>
+        <Button size="lg" variant="outline" className="h-12" onClick={() => navigate("/schedule")}>
+          スケジュール
+        </Button>
+      </div>
+
+      {/* 昨日の日報提出状況 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">
+            {yesterdayLabel} の日報提出状況
+            {yesterdaySubmissionStatus && (
+              <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-100 rounded-full px-2 py-0.5">
+                {yesterdaySubmissionStatus.submitted.length}/
+                {yesterdaySubmissionStatus.submitted.length +
+                  yesterdaySubmissionStatus.unsubmitted.length}
+                名提出済
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-blue-700 mb-2">
+                提出済み（{yesterdaySubmissionStatus?.submitted.length ?? 0}名）
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {(yesterdaySubmissionStatus?.submitted ?? []).map((member) => (
+                  <div
+                    key={`submitted-${member.userId}`}
+                    className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {member.displayName || member.name}
+                      </p>
+                      {member.department && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {DEPARTMENT_LABELS[member.department] ?? member.department}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-red-700 mb-2">
+                未提出（{yesterdaySubmissionStatus?.unsubmitted.length ?? 0}名）
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {(yesterdaySubmissionStatus?.unsubmitted ?? []).map((member) => (
+                  <div
+                    key={`unsubmitted-${member.userId}`}
+                    className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {member.displayName || member.name}
+                      </p>
+                      {member.department && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {DEPARTMENT_LABELS[member.department] ?? member.department}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 共有事項 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base font-semibold">
+              共有事項
+              <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-100 rounded-full px-2 py-0.5">
+                {sharedInfoReports.length}件
+              </span>
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/reports")}>
+              日報一覧
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {previewSharedInfo.length === 0 ? (
+            <p className="text-sm text-muted-foreground">共有事項はありません。</p>
+          ) : (
+            <div className="space-y-1">
+              {previewSharedInfo.map(({ report, user }) => (
+                <button
                   key={report.id}
-                  className="flex items-center justify-between py-1.5 border-b last:border-0 cursor-pointer hover:bg-muted/30 rounded px-1"
+                  type="button"
+                  className="w-full text-left rounded-md px-2 py-2 hover:bg-muted/40 transition-colors border-b last:border-b-0"
                   onClick={() => navigate(`/reports/${report.id}`)}
                 >
-                  <div>
-                    <p className="text-sm font-medium">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {report.department && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full ${
+                          DEPARTMENT_CLASS[report.department] ?? "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {DEPARTMENT_LABELS[report.department] ?? report.department}
+                      </span>
+                    )}
+                    <span>{user?.displayName || user?.name || "不明ユーザー"}</span>
+                    <span>
                       {new Date(report.workDate).toLocaleDateString("ja-JP", {
-                        month: "short",
+                        month: "numeric",
                         day: "numeric",
-                        weekday: "short",
                       })}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {DEPARTMENT_LABELS[report.department] ?? report.department}
-                    </p>
+                    </span>
                   </div>
-                  <Badge
-                    className={`text-xs ${REPORT_STATUS_CLASS[report.status] ?? "bg-gray-100 text-gray-700"}`}
-                  >
-                    {REPORT_STATUS_LABEL[report.status] ?? report.status}
-                  </Badge>
-                </div>
+                  <p className="text-sm mt-1 line-clamp-2">{report.sharedInfo}</p>
+                </button>
               ))}
+              {sharedInfoReports.length > previewSharedInfo.length && (
+                <p className="text-center text-sm text-muted-foreground pt-1">
+                  他 {sharedInfoReports.length - previewSharedInfo.length} 件
+                </p>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

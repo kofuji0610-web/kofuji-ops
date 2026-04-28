@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../lib/trpc";
 import { db } from "../db";
@@ -175,6 +175,86 @@ export const reportsRouter = router({
       )
       .limit(1);
     return { submitted: !!row && row.status !== "draft", report: row ?? null };
+  }),
+
+  // ─── 前日の日報提出状況（閲覧可能メンバー全体）を取得 ────────────────────────────
+  yesterdaySubmissionStatus: protectedProcedure.query(async ({ ctx }) => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const ymd = yesterday.toISOString().split("T")[0];
+    const roles = readableRolesForViewer(ctx.user.role);
+
+    const members = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        displayName: users.displayName,
+        department: users.department,
+      })
+      .from(users)
+      .where(and(eq(users.isActive, true), inArray(users.role, roles)))
+      .orderBy(asc(users.id));
+
+    if (members.length === 0) {
+      return {
+        targetDate: ymd,
+        submitted: [] as Array<{
+          userId: number;
+          name: string;
+          displayName: string | null;
+          department: string | null;
+          reportId: number | null;
+        }>,
+        unsubmitted: [] as Array<{
+          userId: number;
+          name: string;
+          displayName: string | null;
+          department: string | null;
+          reportId: number | null;
+        }>,
+      };
+    }
+
+    const memberIds = members.map((m) => m.id);
+    const rows = await db
+      .select({
+        userId: reports.userId,
+        reportId: reports.id,
+        status: reports.status,
+      })
+      .from(reports)
+      .where(
+        and(inArray(reports.userId, memberIds), eq(reports.workDate, parseYmdToDate(ymd)))
+      );
+
+    const submittedMap = new Map<number, number>();
+    for (const row of rows) {
+      if (row.status !== "draft" && !submittedMap.has(row.userId)) {
+        submittedMap.set(row.userId, row.reportId);
+      }
+    }
+
+    const submitted = members
+      .filter((m) => submittedMap.has(m.id))
+      .map((m) => ({
+        userId: m.id,
+        name: m.name,
+        displayName: m.displayName,
+        department: m.department,
+        reportId: submittedMap.get(m.id) ?? null,
+      }));
+
+    const unsubmitted = members
+      .filter((m) => !submittedMap.has(m.id))
+      .map((m) => ({
+        userId: m.id,
+        name: m.name,
+        displayName: m.displayName,
+        department: m.department,
+        reportId: null,
+      }));
+
+    return { targetDate: ymd, submitted, unsubmitted };
   }),
 
   // ─── 共有情報・受注情報を取得 ────────────────────────────────────────────────
