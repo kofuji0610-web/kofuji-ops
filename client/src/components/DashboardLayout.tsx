@@ -96,19 +96,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       className={cn(
-        "flex flex-col h-full bg-[#0b1633] text-slate-100 border-r border-[#1d2b52]",
-        mobile ? "w-full" : "w-64"
+        "flex flex-col h-full bg-[#0a1530] text-slate-100 border-r border-[#1c2a4f]",
+        mobile ? "w-full" : "w-[250px]"
       )}
     >
       {/* ロゴ */}
-      <div className="px-4 py-4 border-b border-[#1d2b52]">
+      <div className="px-4 py-4 border-b border-[#1c2a4f]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-xs font-bold">
+          <div className="w-8 h-8 rounded-sm bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-[10px] font-bold tracking-wide">
             KFJ
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold leading-tight truncate">コフジ物流株式会社</p>
-            <p className="text-xs text-slate-300 truncate">京浜支店</p>
+            <p className="text-[11px] text-slate-300 truncate">京浜支店</p>
           </div>
         </div>
       </div>
@@ -119,11 +119,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           const items = visibleNavItems.filter((item) => item.group === group);
           if (items.length === 0) return null;
           return (
-            <div key={group} className="mb-3">
-              <p className="px-4 pb-1 text-[11px] font-semibold text-slate-400 tracking-wide">
+            <div key={group} className="mb-4">
+              <p className="px-4 pb-1.5 text-[11px] font-semibold text-slate-400 tracking-wide">
                 {sectionTitles[group]}
               </p>
-              <div className="space-y-0.5 px-2">
+              <div className="space-y-1 px-2">
                 {items.map((item) => {
                   const isActive = !!item.path && location === item.path;
                   return (
@@ -131,16 +131,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       key={item.label}
                       onClick={() => handleNavClick(item, mobile)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors",
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg border transition-colors",
                         item.disabled
-                          ? "text-slate-500 hover:bg-white/5"
+                          ? "text-slate-500 border-transparent hover:bg-white/5"
                           : isActive
-                          ? "bg-[#1e3266] text-white border border-[#33539d]"
-                          : "text-slate-200 hover:bg-[#1b2748] hover:text-white"
+                          ? "bg-[#1d3f8f] text-white border-[#3f66c8] shadow-[inset_0_0_0_1px_rgba(90,130,230,0.2)]"
+                          : "text-slate-200 border-transparent hover:bg-[#182546] hover:text-white"
                       )}
                     >
-                      <item.icon className="w-4 h-4 shrink-0" />
+                      <item.icon className={cn("w-4 h-4 shrink-0", isActive && "text-blue-100")} />
                       <span className="flex-1 text-left">{item.label}</span>
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-200" />}
                     </button>
                   );
                 })}
@@ -152,13 +153,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* ユーザー情報 */}
       <div
-        className="flex items-center gap-3 px-3 py-3 border-t border-[#1d2b52] bg-[#0a142e] cursor-pointer hover:bg-[#121f43]"
+        className="flex items-center gap-3 px-3 py-3 border-t border-[#1c2a4f] bg-[#091229] cursor-pointer hover:bg-[#112044]"
         onClick={() => {
           navigate("/profile");
           if (mobile) setIsMobileOpen(false);
         }}
       >
-        <div className="w-8 h-8 rounded-full bg-[#1e3266] border border-[#33539d] flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-full bg-[#1b336d] border border-[#3a5fb6] flex items-center justify-center shrink-0">
           <User className="w-4 h-4 text-slate-100" />
         </div>
         <div className="min-w-0 flex-1">
