@@ -1,0 +1,27 @@
+# 依存関係
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# ビルド成果物
+client/dist/
+server/dist/
+
+# 環境変数（機密情報）
+.env
+.env.local
+.env.*.local
+
+# ログ
+*.log
+npm-debug.log*
+
+# エディタ
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Drizzle
+migrations/
