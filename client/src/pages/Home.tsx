@@ -209,35 +209,35 @@ export default function Home() {
   // ─── レンダリング ──────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* ヘッダー */}
-      <div>
-        <p className="text-sm text-muted-foreground">{todayLabel}</p>
-        <h1 className="text-2xl font-bold tracking-tight mt-1">
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground/90">{todayLabel}</p>
+        <h1 className="text-3xl font-bold tracking-tight">
           おはようございます、{displayName}さん
         </h1>
         {deptLabel && (
-          <p className="text-sm text-muted-foreground mt-0.5">{deptLabel}</p>
+          <p className="text-sm font-medium text-muted-foreground">{deptLabel}</p>
         )}
       </div>
 
       {/* 勤怠カード */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-between">
+      <Card className="border-slate-200/80 shadow-sm">
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  isWorking ? "bg-green-100" : "bg-muted"
+                  isWorking ? "bg-emerald-100" : "bg-slate-100"
                 }`}
               >
                 <Clock
-                  className={`w-5 h-5 ${isWorking ? "text-green-600" : "text-muted-foreground"}`}
+                  className={`w-5 h-5 ${isWorking ? "text-emerald-600" : "text-slate-500"}`}
                 />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium">{statusLabel}</p>
-                <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                <p className="text-base font-semibold text-slate-900">{statusLabel}</p>
+                <div className="text-sm text-slate-500 mt-1 space-y-0.5">
                   {attendanceData?.clockIn && (
                     <p>
                       ①出勤: {formatTime(attendanceData.clockIn)}
@@ -268,7 +268,7 @@ export default function Home() {
                   size="sm"
                   onClick={handleClockIn}
                   disabled={isPunching}
-                  className="h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                  className="h-10 px-4 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   {step === 0 ? "出勤" : "再出勤"}
@@ -280,7 +280,7 @@ export default function Home() {
                   variant="outline"
                   onClick={handleClockOut}
                   disabled={isPunching}
-                  className="h-9 gap-1.5 border-orange-400 text-orange-600 hover:bg-orange-50"
+                  className="h-10 px-4 gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
                 >
                   <LogOut className="w-4 h-4" />
                   退勤
@@ -296,27 +296,27 @@ export default function Home() {
 
       {/* 出勤中メンバー */}
       {activeMembers && activeMembers.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">出勤中のメンバー</CardTitle>
+        <Card className="border-emerald-100 bg-emerald-50/30 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-emerald-900">出勤中のメンバー</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {activeMembers.map((m) => {
                 if (!m.user) return null;
                 const activeClockIn = getActiveClockInTime(m);
                 return (
                   <div
                     key={m.user.id}
-                    className="flex items-center gap-1.5 bg-muted/60 rounded-full px-3 py-1"
+                    className="flex items-center gap-1.5 bg-white border border-emerald-100 rounded-full px-3 py-1.5"
                   >
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-xs font-medium">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium">
                       {m.user.displayName || m.user.name}
                     </span>
                     {m.user.department && (
                       <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                           DEPARTMENT_CLASS[m.user.department] ?? "bg-gray-100 text-gray-700"
                         }`}
                       >
@@ -324,7 +324,7 @@ export default function Home() {
                       </span>
                     )}
                     {activeClockIn && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-slate-500">
                         出勤 {formatTime(activeClockIn)}
                       </span>
                     )}
@@ -337,22 +337,31 @@ export default function Home() {
       )}
 
       {/* クイック導線 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <Button size="lg" className="h-12" onClick={() => navigate("/reports/new")}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Button
+          size="lg"
+          className="h-12 text-base font-semibold shadow-sm hover:shadow bg-indigo-600 hover:bg-indigo-700"
+          onClick={() => navigate("/reports/new")}
+        >
           日報を作成
         </Button>
-        <Button size="lg" variant="outline" className="h-12" onClick={() => navigate("/schedule")}>
+        <Button
+          size="lg"
+          variant="outline"
+          className="h-12 text-base font-semibold border-slate-300 hover:bg-slate-50"
+          onClick={() => navigate("/schedule")}
+        >
           スケジュール
         </Button>
       </div>
 
       {/* 昨日の日報提出状況 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">
+      <Card className="border-slate-200/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold text-slate-900">
             {yesterdayLabel} の日報提出状況
             {yesterdaySubmissionStatus && (
-              <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-100 rounded-full px-2 py-0.5">
+              <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-2.5 py-1 align-middle">
                 {yesterdaySubmissionStatus.submitted.length}/
                 {yesterdaySubmissionStatus.submitted.length +
                   yesterdaySubmissionStatus.unsubmitted.length}
@@ -362,23 +371,23 @@ export default function Home() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <p className="text-xs font-semibold text-blue-700 mb-2">
+              <p className="text-sm font-semibold text-sky-800 mb-2.5">
                 提出済み（{yesterdaySubmissionStatus?.submitted.length ?? 0}名）
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {(yesterdaySubmissionStatus?.submitted ?? []).map((member) => (
                   <div
                     key={`submitted-${member.userId}`}
-                    className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50/70 px-3.5 py-2.5"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
                         {member.displayName || member.name}
                       </p>
                       {member.department && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-slate-500 mt-0.5">
                           {DEPARTMENT_LABELS[member.department] ?? member.department}
                         </p>
                       )}
@@ -389,21 +398,21 @@ export default function Home() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-red-700 mb-2">
+              <p className="text-sm font-semibold text-rose-800 mb-2.5">
                 未提出（{yesterdaySubmissionStatus?.unsubmitted.length ?? 0}名）
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {(yesterdaySubmissionStatus?.unsubmitted ?? []).map((member) => (
                   <div
                     key={`unsubmitted-${member.userId}`}
-                    className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50/70 px-3.5 py-2.5"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
                         {member.displayName || member.name}
                       </p>
                       {member.department && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-slate-500 mt-0.5">
                           {DEPARTMENT_LABELS[member.department] ?? member.department}
                         </p>
                       )}
@@ -417,16 +426,16 @@ export default function Home() {
       </Card>
 
       {/* 共有事項 */}
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="border-slate-200/80 shadow-sm">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base font-semibold">
+            <CardTitle className="text-lg font-bold text-slate-900">
               共有事項
-              <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-100 rounded-full px-2 py-0.5">
+              <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-2.5 py-1 align-middle">
                 {sharedInfoReports.length}件
               </span>
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/reports")}>
+            <Button variant="ghost" size="sm" className="font-semibold" onClick={() => navigate("/reports")}>
               日報一覧
             </Button>
           </div>
@@ -435,15 +444,15 @@ export default function Home() {
           {previewSharedInfo.length === 0 ? (
             <p className="text-sm text-muted-foreground">共有事項はありません。</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {previewSharedInfo.map(({ report, user }) => (
                 <button
                   key={report.id}
                   type="button"
-                  className="w-full text-left rounded-md px-2 py-2 hover:bg-muted/40 transition-colors border-b last:border-b-0"
+                  className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
                   onClick={() => navigate(`/reports/${report.id}`)}
                 >
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
                     {report.department && (
                       <span
                         className={`px-2 py-0.5 rounded-full ${
@@ -461,7 +470,7 @@ export default function Home() {
                       })}
                     </span>
                   </div>
-                  <p className="text-sm mt-1 line-clamp-2">{report.sharedInfo}</p>
+                  <p className="text-sm leading-6 mt-1 text-slate-800 line-clamp-2">{report.sharedInfo}</p>
                 </button>
               ))}
               {sharedInfoReports.length > previewSharedInfo.length && (

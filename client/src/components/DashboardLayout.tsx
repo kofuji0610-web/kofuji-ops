@@ -7,39 +7,47 @@ import {
   Calendar,
   User,
   Users,
-  Wrench,
+  Car,
   ShoppingCart,
-  ChevronRight,
+  BarChart3,
+  Settings,
+  Building,
   Menu,
   X,
-  Building2,
-  PaintBucket,
-  Drone,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
+import { toast } from "sonner";
 
 // ─── ナビゲーション定義 ───────────────────────────────────────────────────────
 
 interface NavItem {
   label: string;
-  path: string;
+  path?: string;
   icon: React.ComponentType<{ className?: string }>;
+  group: "menu" | "asset" | "analytics" | "admin";
   roles?: string[];
   departments?: string[];
+  disabled?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "ホーム", path: "/", icon: Home },
-  { label: "業務日報", path: "/reports", icon: FileText },
-  { label: "勤怠管理", path: "/attendance", icon: Clock },
-  { label: "スケジュール", path: "/schedule", icon: Calendar },
-  { label: "整備記録", path: "/maintenance", icon: Wrench, departments: ["maintenance", "admin"] },
-  { label: "購買申請", path: "/purchase", icon: ShoppingCart },
-  { label: "塗装営業", path: "/painting-sales", icon: PaintBucket, departments: ["painting", "admin"] },
-  { label: "ドローン営業", path: "/drone-sales", icon: Drone, departments: ["drone", "admin"] },
-  { label: "ユーザー管理", path: "/admin/users", icon: Users, roles: ["admin"] },
+  { label: "ダッシュボード", path: "/", icon: Home, group: "menu" },
+  { label: "業務日報", path: "/reports", icon: FileText, group: "menu" },
+  { label: "勤怠管理", path: "/attendance", icon: Clock, group: "menu" },
+  { label: "スケジュール", path: "/schedule", icon: Calendar, group: "menu" },
+
+  { label: "購買申請", path: "/purchase", icon: ShoppingCart, group: "asset" },
+  { label: "車輌管理", path: "/maintenance", icon: Car, group: "asset", departments: ["maintenance", "admin"] },
+
+  { label: "塗装売上集計", path: "/painting-sales", icon: BarChart3, group: "analytics", departments: ["painting", "admin"] },
+  { label: "ドローン売上集計", path: "/drone-sales", icon: BarChart3, group: "analytics", departments: ["drone", "admin"] },
+
+  { label: "ユーザー管理", path: "/admin/users", icon: Users, group: "admin", roles: ["admin"] },
+  { label: "部署管理", icon: Building, group: "admin", roles: ["admin"], disabled: true },
+  { label: "システム設定", icon: Settings, group: "admin", roles: ["admin"], disabled: true },
 ];
 
 // ─── コンポーネント ───────────────────────────────────────────────────────────
@@ -65,69 +73,103 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return true;
   });
 
+  const sectionTitles: Record<NavItem["group"], string> = {
+    menu: "メニュー",
+    asset: "資産管理",
+    analytics: "集計",
+    admin: "管理",
+  };
+
+  const navGroups: NavItem["group"][] = ["menu", "asset", "analytics", "admin"];
+  const roleLabel =
+    user.role === "admin" ? "管理者" : user.role === "manager" ? "マネージャー" : "一般";
+
+  const handleNavClick = (item: NavItem, mobile: boolean) => {
+    if (item.disabled || !item.path) {
+      toast.info(`${item.label} は準備中です`);
+      return;
+    }
+    navigate(item.path);
+    if (mobile) setIsMobileOpen(false);
+  };
+
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       className={cn(
-        "flex flex-col h-full bg-background border-r",
+        "flex flex-col h-full bg-[#0b1633] text-slate-100 border-r border-[#1d2b52]",
         mobile ? "w-full" : "w-64"
       )}
     >
       {/* ロゴ */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Building2 className="w-4 h-4 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold leading-tight truncate">コフジ物流</p>
-          <p className="text-xs text-muted-foreground truncate">業務管理システム</p>
+      <div className="px-4 py-4 border-b border-[#1d2b52]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-xs font-bold">
+            KFJ
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold leading-tight truncate">コフジ物流株式会社</p>
+            <p className="text-xs text-slate-300 truncate">京浜支店</p>
+          </div>
         </div>
       </div>
 
       {/* ナビゲーション */}
-      <nav className="flex-1 overflow-y-auto py-2">
-        {visibleNavItems.map((item) => {
-          const isActive = location === item.path;
+      <nav className="flex-1 overflow-y-auto py-3">
+        {navGroups.map((group) => {
+          const items = visibleNavItems.filter((item) => item.group === group);
+          if (items.length === 0) return null;
           return (
-            <button
-              key={item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (mobile) setIsMobileOpen(false);
-              }}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              )}
-            >
-              <item.icon className="w-4 h-4 shrink-0" />
-              <span className="flex-1 text-left">{item.label}</span>
-              {isActive && <ChevronRight className="w-3 h-3" />}
-            </button>
+            <div key={group} className="mb-3">
+              <p className="px-4 pb-1 text-[11px] font-semibold text-slate-400 tracking-wide">
+                {sectionTitles[group]}
+              </p>
+              <div className="space-y-0.5 px-2">
+                {items.map((item) => {
+                  const isActive = !!item.path && location === item.path;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => handleNavClick(item, mobile)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors",
+                        item.disabled
+                          ? "text-slate-500 hover:bg-white/5"
+                          : isActive
+                          ? "bg-[#1e3266] text-white border border-[#33539d]"
+                          : "text-slate-200 hover:bg-[#1b2748] hover:text-white"
+                      )}
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span className="flex-1 text-left">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
 
       {/* ユーザー情報 */}
       <div
-        className="flex items-center gap-3 px-4 py-3 border-t cursor-pointer hover:bg-muted/40"
+        className="flex items-center gap-3 px-3 py-3 border-t border-[#1d2b52] bg-[#0a142e] cursor-pointer hover:bg-[#121f43]"
         onClick={() => {
           navigate("/profile");
           if (mobile) setIsMobileOpen(false);
         }}
       >
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-          <User className="w-4 h-4 text-primary" />
+        <div className="w-8 h-8 rounded-full bg-[#1e3266] border border-[#33539d] flex items-center justify-center shrink-0">
+          <User className="w-4 h-4 text-slate-100" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">
+          <p className="text-sm font-semibold truncate text-slate-100">
             {user.displayName || user.name}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {user.username}
+          <p className="text-xs text-slate-400 truncate">
+            {user.department ?? "未設定"} ・ {roleLabel}
           </p>
         </div>
+        <ChevronDown className="w-4 h-4 text-slate-500" />
       </div>
     </div>
   );
@@ -162,14 +204,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setIsMobileOpen(true)}
             className="h-8 w-8"
           >
-            <Menu className="w-5 h-5" />
+            {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
-          <p className="text-sm font-semibold">コフジ物流 業務管理</p>
+          <p className="text-sm font-semibold">コフジ物流株式会社</p>
         </header>
 
         {/* ページコンテンツ */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-4 py-5">{children}</div>
+          <div className="max-w-5xl mx-auto px-4 py-5">{children}</div>
         </main>
       </div>
     </div>
