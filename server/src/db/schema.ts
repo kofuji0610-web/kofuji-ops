@@ -1,8 +1,10 @@
 import {
   mysqlTable,
+  mysqlEnum,
   serial,
   varchar,
   int,
+  float,
   timestamp,
   date,
   text,
@@ -156,6 +158,105 @@ export const maintenanceRecords = mysqlTable("maintenance_records", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
 
+// ─── Maintenance Reports (new normalized model) ───────────────────────────────
+
+export const maintenanceReports = mysqlTable("maintenance_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  vehicleType: varchar("vehicleType", { length: 100 }),
+  vehicleNumber: varchar("vehicleNumber", { length: 50 }),
+  workCategory: mysqlEnum("workCategory", [
+    "legal_inspection_3month",
+    "legal_inspection_12month",
+    "vehicle_inspection",
+    "general_repair",
+    "scheduled_maintenance",
+    "accident_repair",
+    "roadside_repair",
+    "other",
+  ]).notNull(),
+  workCategoryNote: text("workCategoryNote"),
+  odometer: int("odometer"),
+  workStartTime: varchar("workStartTime", { length: 10 }),
+  workEndTime: varchar("workEndTime", { length: 10 }),
+  workMinutes: int("workMinutes"),
+  workDate: date("workDate").notNull(),
+  isAccident: boolean("isAccident").notNull().default(false),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+});
+
+export const maintenanceDetails = mysqlTable("maintenance_details", {
+  id: serial("id").primaryKey(),
+  reportId: int("reportId").notNull(),
+  partCategory: mysqlEnum("partCategory", [
+    "engine",
+    "drivetrain",
+    "suspension",
+    "brake",
+    "electrical",
+    "body",
+    "other",
+  ]).notNull(),
+  partCategoryNote: text("partCategoryNote"),
+  condition: mysqlEnum("condition", [
+    "normal",
+    "worn",
+    "damaged",
+    "cracked",
+    "leaking",
+    "bulb_out",
+    "other",
+  ]).notNull(),
+  conditionNote: text("conditionNote"),
+  action: mysqlEnum("action", [
+    "inspection_only",
+    "cleaning",
+    "adjustment",
+    "lubrication",
+    "parts_replacement",
+    "repair",
+    "observation",
+    "other",
+  ]).notNull(),
+  actionNote: text("actionNote"),
+  notes: text("notes"),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+});
+
+export const maintenancePhotos = mysqlTable("maintenance_photos", {
+  id: serial("id").primaryKey(),
+  detailId: int("detailId").notNull(),
+  fileKey: varchar("fileKey", { length: 500 }).notNull(),
+  fileUrl: varchar("fileUrl", { length: 500 }).notNull(),
+  fileName: varchar("fileName", { length: 255 }),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+});
+
+export const maintenanceParts = mysqlTable("maintenance_parts", {
+  id: serial("id").primaryKey(),
+  detailId: int("detailId").notNull(),
+  masterCategory: mysqlEnum("masterCategory", [
+    "oil_fluid",
+    "consumable",
+    "misc",
+    "repair_work",
+    "exterior",
+  ]).notNull(),
+  partName: varchar("partName", { length: 200 }).notNull(),
+  partNameFree: text("partNameFree"),
+  quantity: float("quantity").notNull().default(1),
+  unit: varchar("unit", { length: 20 }).notNull().default("個"),
+  position: varchar("position", { length: 50 }),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+});
+
 // ─── Purchase Requests ────────────────────────────────────────────────────────
 
 export const purchaseRequests = mysqlTable("purchase_requests", {
@@ -185,4 +286,12 @@ export type NewReportTask = typeof reportTasks.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
 export type NewSchedule = typeof schedules.$inferInsert;
 export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
+export type MaintenanceReport = typeof maintenanceReports.$inferSelect;
+export type NewMaintenanceReport = typeof maintenanceReports.$inferInsert;
+export type MaintenanceDetail = typeof maintenanceDetails.$inferSelect;
+export type NewMaintenanceDetail = typeof maintenanceDetails.$inferInsert;
+export type MaintenancePhoto = typeof maintenancePhotos.$inferSelect;
+export type NewMaintenancePhoto = typeof maintenancePhotos.$inferInsert;
+export type MaintenancePart = typeof maintenanceParts.$inferSelect;
+export type NewMaintenancePart = typeof maintenanceParts.$inferInsert;
 export type PurchaseRequest = typeof purchaseRequests.$inferSelect;

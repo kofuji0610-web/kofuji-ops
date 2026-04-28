@@ -11,6 +11,8 @@ const DEPARTMENT_LABELS: Record<string, string> = {
   painting: "塗装",
   slitter: "スリッター",
   drone: "ドローン",
+  warehouse: "倉庫",
+  operation: "運行管理",
   admin: "管理",
 };
 

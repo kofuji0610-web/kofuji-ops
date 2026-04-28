@@ -50,6 +50,16 @@ const NAV_ITEMS: NavItem[] = [
   { label: "システム設定", icon: Settings, group: "admin", roles: ["admin"], disabled: true },
 ];
 
+const DEPARTMENT_LABELS: Record<string, string> = {
+  maintenance: "整備",
+  painting: "塗装",
+  slitter: "スリッター",
+  drone: "ドローン",
+  warehouse: "倉庫",
+  operation: "運行管理",
+  admin: "管理",
+};
+
 // ─── コンポーネント ───────────────────────────────────────────────────────────
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -101,14 +111,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
     >
       {/* ロゴ */}
-      <div className="px-4 py-4 border-b border-[#1c2a4f]">
+      <div className="px-4 py-3 border-b border-[#1c2a4f]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-sm bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-[10px] font-bold tracking-wide">
-            KFJ
+          <div className="w-12 h-12 rounded-md bg-[#081127] border border-white/20 flex items-center justify-center shrink-0 overflow-hidden">
+            <img
+              src="/kfj-logo.png"
+              alt="KFJ Logistics"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold leading-tight truncate">コフジ物流株式会社</p>
-            <p className="text-[11px] text-slate-300 truncate">京浜支店</p>
+            <p className="text-[13px] font-bold leading-tight truncate">コフジ物流株式会社</p>
+            <p className="text-[10px] text-slate-300 truncate">関東支店</p>
+            <p className="text-[10px] text-slate-400 truncate">統合部署</p>
           </div>
         </div>
       </div>
@@ -167,7 +182,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             {user.displayName || user.name}
           </p>
           <p className="text-xs text-slate-400 truncate">
-            {user.department ?? "未設定"} ・ {roleLabel}
+            {user.department ? (DEPARTMENT_LABELS[user.department] ?? user.department) : "未設定"} ・ {roleLabel}
           </p>
         </div>
         <ChevronDown className="w-4 h-4 text-slate-500" />

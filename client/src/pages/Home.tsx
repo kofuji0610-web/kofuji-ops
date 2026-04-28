@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { LogIn, LogOut, Clock } from "lucide-react";
+import { LogIn, LogOut, Clock, Plus, CalendarDays, Users } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -14,6 +14,8 @@ const DEPARTMENT_LABELS: Record<string, string> = {
   painting: "塗装",
   slitter: "スリッター",
   drone: "ドローン",
+  warehouse: "倉庫",
+  operation: "運行管理",
   admin: "管理",
 };
 
@@ -22,6 +24,8 @@ const DEPARTMENT_CLASS: Record<string, string> = {
   painting: "bg-green-100 text-green-800",
   slitter: "bg-orange-100 text-orange-800",
   drone: "bg-purple-100 text-purple-800",
+  warehouse: "bg-teal-100 text-teal-800",
+  operation: "bg-cyan-100 text-cyan-800",
 };
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
@@ -78,6 +82,21 @@ export default function Home() {
 
   const { data: activeMembers, refetch: refetchActiveMembers } =
     trpc.attendance.activeMembers.useQuery();
+
+  const todayRange = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { startAt: start.toISOString(), endAt: end.toISOString() };
+  }, []);
+
+  const { data: todayMemberSchedules } = trpc.schedules.list.useQuery({
+    startAt: todayRange.startAt,
+    endAt: todayRange.endAt,
+    myOnly: false,
+  });
 
   const { data: sharedReports } = trpc.reports.sharedAndOrders.useQuery({ limit: 20 });
   const { data: yesterdaySubmissionStatus } =
@@ -197,6 +216,17 @@ export default function Home() {
     return null;
   };
 
+  const schedulesByUserId = useMemo(() => {
+    const map = new Map<number, Array<{ id: number; title: string; startAt: Date | string }>>();
+    for (const s of todayMemberSchedules ?? []) {
+      if (!s.user?.id) continue;
+      const list = map.get(s.user.id) ?? [];
+      list.push({ id: s.id, title: s.title, startAt: s.startAt });
+      map.set(s.user.id, list);
+    }
+    return map;
+  }, [todayMemberSchedules]);
+
   const statusLabel =
     step === 6
       ? "本日の打刻完了"
@@ -222,7 +252,7 @@ export default function Home() {
       </div>
 
       {/* 勤怠カード */}
-      <Card className="border-slate-200/80 shadow-sm">
+      <Card className={isWorking ? "border-l-4 border-l-emerald-500 border-slate-200/80 shadow-sm" : "border-slate-200/80 shadow-sm"}>
         <CardContent className="pt-5 pb-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -297,36 +327,55 @@ export default function Home() {
       {/* 出勤中メンバー */}
       {activeMembers && activeMembers.length > 0 && (
         <Card className="border-emerald-100 bg-emerald-50/30 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-emerald-900">出勤中のメンバー</CardTitle>
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-base font-semibold text-emerald-900 flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              出勤中のメンバー
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+                {activeMembers.length}人
+              </span>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2.5">
+          <CardContent className="pt-0 pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {activeMembers.map((m) => {
                 if (!m.user) return null;
                 const activeClockIn = getActiveClockInTime(m);
+                const memberSchedules = schedulesByUserId.get(m.user.id) ?? [];
                 return (
                   <div
                     key={m.user.id}
-                    className="flex items-center gap-1.5 bg-white border border-emerald-100 rounded-full px-3 py-1.5"
+                    className="bg-white border border-emerald-100 rounded-md px-3 py-2"
                   >
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-sm font-medium">
-                      {m.user.displayName || m.user.name}
-                    </span>
-                    {m.user.department && (
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                          DEPARTMENT_CLASS[m.user.department] ?? "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {DEPARTMENT_LABELS[m.user.department] ?? m.user.department}
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-medium">
+                        {m.user.displayName || m.user.name}
                       </span>
-                    )}
-                    {activeClockIn && (
-                      <span className="text-xs text-slate-500">
-                        出勤 {formatTime(activeClockIn)}
-                      </span>
+                      {m.user.department && (
+                        <span
+                          className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${
+                            DEPARTMENT_CLASS[m.user.department] ?? "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {DEPARTMENT_LABELS[m.user.department] ?? m.user.department}
+                        </span>
+                      )}
+                      {activeClockIn && (
+                        <span className="text-[11px] text-slate-500 ml-auto">
+                          {formatTime(activeClockIn)}〜
+                        </span>
+                      )}
+                    </div>
+
+                    {memberSchedules.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {memberSchedules.slice(0, 2).map((schedule) => (
+                          <div key={schedule.id} className="text-[11px] text-emerald-700 truncate">
+                            {schedule.title}　{formatTime(schedule.startAt)}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
@@ -340,17 +389,19 @@ export default function Home() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Button
           size="lg"
-          className="h-12 text-base font-semibold shadow-sm hover:shadow bg-indigo-600 hover:bg-indigo-700"
+          className="h-12 text-base font-semibold shadow-sm hover:shadow bg-indigo-600 hover:bg-indigo-700 gap-2"
           onClick={() => navigate("/reports/new")}
         >
+          <Plus className="w-4 h-4" />
           日報を作成
         </Button>
         <Button
           size="lg"
           variant="outline"
-          className="h-12 text-base font-semibold border-slate-300 hover:bg-slate-50"
+          className="h-12 text-base font-semibold border-slate-300 hover:bg-slate-50 gap-2"
           onClick={() => navigate("/schedule")}
         >
+          <CalendarDays className="w-4 h-4" />
           スケジュール
         </Button>
       </div>

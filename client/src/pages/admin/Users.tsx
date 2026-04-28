@@ -19,6 +19,8 @@ const DEPT_LABELS: Record<string, string> = {
   painting: "塗装",
   slitter: "スリッター",
   drone: "ドローン",
+  warehouse: "倉庫",
+  operation: "運行管理",
   admin: "管理",
 };
 
@@ -84,7 +86,7 @@ export default function AdminUsers() {
         name: form.name,
         displayName: form.displayName || null,
         role: form.role,
-        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "admin") || null,
+        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "warehouse" | "operation" | "admin") || null,
         ...(form.password ? { password: form.password } : {}),
       });
     } else {
@@ -94,7 +96,7 @@ export default function AdminUsers() {
         name: form.name,
         displayName: form.displayName || null,
         role: form.role,
-        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "admin") || null,
+        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "warehouse" | "operation" | "admin") || null,
       });
     }
   };
@@ -191,6 +193,8 @@ export default function AdminUsers() {
                     <option value="painting">塗装</option>
                     <option value="slitter">スリッター</option>
                     <option value="drone">ドローン</option>
+                    <option value="warehouse">倉庫</option>
+                    <option value="operation">運行管理</option>
                     <option value="admin">管理</option>
                   </select>
                 </div>

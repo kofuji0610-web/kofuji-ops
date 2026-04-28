@@ -4,6 +4,7 @@ import { attendanceRouter } from "./attendance";
 import { reportsRouter, reportTasksRouter } from "./reports";
 import { usersRouter } from "./users";
 import { schedulesRouter } from "./schedules";
+import { maintenanceRouter } from "./maintenance";
 
 export const appRouter = router({
   auth: authRouter,
@@ -12,6 +13,7 @@ export const appRouter = router({
   reportTasks: reportTasksRouter,
   users: usersRouter,
   schedules: schedulesRouter,
+  maintenance: maintenanceRouter,
 });
 
 export type AppRouter = typeof appRouter;

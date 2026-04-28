@@ -9,7 +9,6 @@ import Schedule from "./pages/Schedule";
 import Profile from "./pages/Profile";
 import AdminUsers from "./pages/admin/Users";
 import MaintenanceList from "./pages/MaintenanceList";
-import MaintenanceReport from "./pages/MaintenanceReport";
 import MaintenanceDetail from "./pages/MaintenanceDetail";
 import PurchaseApproval from "./pages/PurchaseApproval";
 import PurchaseDashboard from "./pages/PurchaseDashboard";
@@ -31,7 +30,7 @@ function AuthenticatedRoutes() {
         <Route path="/profile" component={Profile} />
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/maintenance" component={MaintenanceList} />
-        <Route path="/maintenance/new" component={MaintenanceReport} />
+        <Route path="/maintenance/new" component={ReportNew} />
         <Route path="/maintenance/:id" component={MaintenanceDetail} />
         <Route path="/purchase" component={PurchaseApproval} />
         <Route path="/purchase/dashboard" component={PurchaseDashboard} />

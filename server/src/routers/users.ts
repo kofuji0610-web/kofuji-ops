@@ -23,7 +23,7 @@ export const usersRouter = router({
         email: z.string().email().optional().nullable(),
         role: z.enum(["user", "manager", "admin"]).default("user"),
         department: z
-          .enum(["maintenance", "painting", "slitter", "drone", "admin"])
+          .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
           .optional()
           .nullable(),
       })
@@ -60,7 +60,7 @@ export const usersRouter = router({
         email: z.string().email().optional().nullable(),
         role: z.enum(["user", "manager", "admin"]).optional(),
         department: z
-          .enum(["maintenance", "painting", "slitter", "drone", "admin"])
+          .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
           .optional()
           .nullable(),
         isActive: z.boolean().optional(),
