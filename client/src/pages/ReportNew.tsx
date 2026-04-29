@@ -664,93 +664,101 @@ function SlitterRecordBlock({
 }) {
   const filterNum = (v: string) => v.replace(/[^0-9.]/g, "");
   return (
-    <div className="border-2 border-amber-300 bg-amber-50/40 rounded-lg p-4 space-y-3">
+    <div className="border-2 border-sky-300 rounded-xl p-3.5 space-y-3 bg-white shadow-sm">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-amber-700">✂️ 案件 {VEHICLE_LABELS[index]}</span>
+        <p className="text-sm font-semibold text-sky-900">✂️ 案件 {VEHICLE_LABELS[index]}</p>
         {total > 1 && (
-          <button type="button" onClick={() => onRemove(index)}
-            className="h-7 w-7 flex items-center justify-center rounded text-red-500 hover:bg-red-50">
+          <Button variant="ghost" size="icon" onClick={() => onRemove(index)}
+            className="h-7 w-7 text-destructive">
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         )}
       </div>
-      <div className="space-y-1">
-        <Label className="text-xs">荷主名</Label>
+      {/* 荷主 */}
+      <div className="flex items-center gap-2">
+        <Label className="text-xs w-20 shrink-0 text-sky-700 font-semibold">荷主名</Label>
         <MemoryInput memoryKey="client_name" placeholder="荷主名を入力"
           value={record.clientName}
           onChange={(v) => onChange(index, { ...record, clientName: v })}
-          className="h-9 text-sm" />
+          className="h-9 text-sm flex-1" />
       </div>
-      <SlitterSizeInput label="元原紙サイズ"
-        w={record.rawW} l={record.rawL} len={record.rawLen}
-        onChangeW={(v) => onChange(index, { ...record, rawW: v })}
-        onChangeL={(v) => onChange(index, { ...record, rawL: v })}
-        onChangeLen={(v) => onChange(index, { ...record, rawLen: v })}
-        showParens={false} />
-      <SlitterSizeInput label="加工サイズ"
-        w={record.procW} l={record.procL} len={record.procLen}
-        onChangeW={(v) => onChange(index, { ...record, procW: v })}
-        onChangeL={(v) => onChange(index, { ...record, procL: v })}
-        onChangeLen={(v) => onChange(index, { ...record, procLen: v })}
-        showParens={true} />
-      <div className="grid grid-cols-3 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">本数</Label>
+
+      {/* サイズ */}
+      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2.5 bg-sky-50/30">
+        <p className="text-xs font-semibold text-sky-700">📐 サイズ</p>
+        <SlitterSizeInput label="元原紙"
+          w={record.rawW} l={record.rawL} len={record.rawLen}
+          onChangeW={(v) => onChange(index, { ...record, rawW: v })}
+          onChangeL={(v) => onChange(index, { ...record, rawL: v })}
+          onChangeLen={(v) => onChange(index, { ...record, rawLen: v })}
+          showParens={false} />
+        <SlitterSizeInput label="加工後"
+          w={record.procW} l={record.procL} len={record.procLen}
+          onChangeW={(v) => onChange(index, { ...record, procW: v })}
+          onChangeL={(v) => onChange(index, { ...record, procL: v })}
+          onChangeLen={(v) => onChange(index, { ...record, procLen: v })}
+          showParens={true} />
+      </div>
+
+      {/* 加工設定 */}
+      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2 bg-sky-50/30">
+        <p className="text-xs font-semibold text-sky-700">⚙️ 加工設定</p>
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground shrink-0">本数</Label>
             <Input placeholder="0" value={record.honsu}
               onChange={(e) => onChange(index, { ...record, honsu: filterNum(e.target.value) })}
-              className="h-9 text-sm" />
-            <span className="text-xs text-muted-foreground shrink-0">本</span>
+              className="h-8 text-sm w-16" />
+            <span className="text-xs text-muted-foreground">本</span>
           </div>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">丁取り数</Label>
           <div className="flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground shrink-0">丁取り</Label>
             <Input placeholder="0" value={record.choTori}
               onChange={(e) => onChange(index, { ...record, choTori: filterNum(e.target.value) })}
-              className="h-9 text-sm" />
-            <span className="text-xs text-muted-foreground shrink-0">丁</span>
+              className="h-8 text-sm w-16" />
+            <span className="text-xs text-muted-foreground">丁</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground shrink-0">速度</Label>
+            <Input placeholder="0" value={record.speed}
+              onChange={(e) => onChange(index, { ...record, speed: filterNum(e.target.value) })}
+              className="h-8 text-sm w-16" />
+          </div>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground shrink-0">総仕上げ</Label>
+            <Input placeholder="0" value={record.totalM}
+              onChange={(e) => onChange(index, { ...record, totalM: filterNum(e.target.value) })}
+              className="h-8 text-sm w-20" />
+            <span className="text-xs text-muted-foreground">m</span>
           </div>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">速度</Label>
-          <Input placeholder="0" value={record.speed}
-            onChange={(e) => onChange(index, { ...record, speed: filterNum(e.target.value) })}
-            className="h-9 text-sm" />
-        </div>
       </div>
-      {/* 作業時間ボタン */}
-      <div className="space-y-2">
-        <Label className="text-xs font-semibold">作業時間</Label>
+
+      {/* 作業時間 */}
+      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2 bg-sky-50/30">
+        <p className="text-xs font-semibold text-sky-700">⏱ 作業時間</p>
         <div className="flex items-center gap-2 flex-wrap">
           {!record.startTime ? (
-            <button
-              type="button"
+            <button type="button"
               onClick={() => {
                 const now = new Date();
                 const start = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
                 onChange(index, { ...record, startTime: start, processTime: "" });
               }}
-              className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm transition-colors"
-            >
+              className="h-9 px-4 rounded-md bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold shadow-sm transition-colors">
               ▶ 作業開始
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-amber-50 border-2 border-amber-300">
-              <span className="text-xs text-amber-600 font-medium">開始</span>
-              <span className="text-sm font-bold text-amber-700">{record.startTime}</span>
-              <button
-                type="button"
+            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-white border-2 border-sky-300">
+              <span className="text-xs text-sky-600 font-medium">開始</span>
+              <span className="text-sm font-bold text-sky-700">{record.startTime}</span>
+              <button type="button"
                 onClick={() => onChange(index, { ...record, startTime: "", processTime: "" })}
-                className="text-xs text-amber-400 hover:text-red-500 ml-1"
-              >
-                ✕
-              </button>
+                className="text-xs text-sky-300 hover:text-red-500 ml-1">✕</button>
             </div>
           )}
           {record.startTime && !record.endTime && (
-            <button
-              type="button"
+            <button type="button"
               onClick={() => {
                 const now = new Date();
                 const end = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -764,26 +772,21 @@ function SlitterRecordBlock({
                 }
                 onChange(index, { ...record, endTime: end, processTime });
               }}
-              className="h-9 px-4 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-sm transition-colors"
-            >
+              className="h-9 px-4 rounded-md bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold shadow-sm transition-colors">
               ■ 作業終了
             </button>
           )}
           {record.endTime && (
-            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-sky-50 border-2 border-sky-300">
-              <span className="text-xs text-sky-600 font-medium">終了</span>
-              <span className="text-sm font-bold text-sky-700">{record.endTime}</span>
-              <button
-                type="button"
+            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-white border-2 border-slate-300">
+              <span className="text-xs text-slate-500 font-medium">終了</span>
+              <span className="text-sm font-bold text-slate-700">{record.endTime}</span>
+              <button type="button"
                 onClick={() => onChange(index, { ...record, endTime: "", processTime: "" })}
-                className="text-xs text-sky-400 hover:text-red-500 ml-1"
-              >
-                ✕
-              </button>
+                className="text-xs text-slate-300 hover:text-red-500 ml-1">✕</button>
             </div>
           )}
           {record.processTime && (
-            <div className="flex items-center gap-1 px-3 h-9 rounded-md bg-emerald-50 border-2 border-emerald-300">
+            <div className="flex items-center gap-1 px-3 h-9 rounded-md bg-white border-2 border-emerald-300">
               <span className="text-xs text-emerald-600 font-medium">加工時間</span>
               <span className="text-sm font-bold text-emerald-700">{record.processTime}</span>
               <span className="text-xs text-emerald-500">h</span>
@@ -791,15 +794,8 @@ function SlitterRecordBlock({
           )}
         </div>
       </div>
-      <div className="space-y-1">
-        <Label className="text-xs">総仕上げm</Label>
-        <div className="flex items-center gap-1">
-          <Input placeholder="0" value={record.totalM}
-            onChange={(e) => onChange(index, { ...record, totalM: filterNum(e.target.value) })}
-            className="h-9 text-sm w-28" />
-          <span className="text-xs text-muted-foreground shrink-0">m</span>
-        </div>
-      </div>
+
+      {/* 備考 */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">備考（任意）</Label>
         <textarea placeholder="特記事項があれば記入" value={record.note}
@@ -2091,8 +2087,12 @@ export default function ReportNew() {
       {/* スリッター案件別裁断記録 */}
       {hasSlitter && (
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">✂️ 案件別裁断記録</CardTitle>
+            <Button variant="outline" size="sm" onClick={addSlitterRecord}
+              className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
+              <Plus className="w-3.5 h-3.5" />案件を追加
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {slitterRecords.map((record, i) => (
@@ -2100,9 +2100,11 @@ export default function ReportNew() {
                 key={i} record={record} index={i} total={slitterRecords.length}
                 onChange={updateSlitterRecord} onRemove={removeSlitterRecord} />
             ))}
-            <Button variant="outline" size="sm" onClick={addSlitterRecord} className="w-full h-9 gap-1">
-              <Plus className="w-3.5 h-3.5" />案件を追加
-            </Button>
+            {slitterRecords.length > 1 && (
+              <p className="text-xs text-muted-foreground text-center">
+                この案件は完了しました。次の案件は【＋案件を追加】から追加できます
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
