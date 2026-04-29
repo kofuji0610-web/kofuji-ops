@@ -2135,7 +2135,7 @@ export default function ReportNew() {
             {/* 全案件合計（複数案件のとき） */}
             {(() => {
               const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
-              if (done.length < 2) return null;
+              if (done.length < 1) return null;
               const totalH = done.reduce((sum, r) => sum + (parseFloat(r.processTime) || 0), 0);
               const totalM = slitterRecords.reduce((sum, r) => sum + (parseFloat(r.totalM) || 0), 0);
               const totalMin = Math.round(totalH * 60);
