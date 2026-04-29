@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, Plus, Play, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Plus, Play, Trash2, Ruler, Wrench, CheckCircle, RotateCcw } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -19,17 +19,6 @@ const DEPARTMENT_OPTIONS = [
   { value: "admin", label: "管理" },
 ];
 
-const MAINTENANCE_PURPOSES = [
-  "3カ月法定点検",
-  "12カ月法定点検",
-  "車検整備",
-  "一般修理",
-  "定期整備",
-  "事故修理",
-  "路上修理",
-  "その他",
-];
-
 const MAINTENANCE_CATEGORIES = [
   "エンジン系",
   "動力伝達系",
@@ -41,13 +30,13 @@ const MAINTENANCE_CATEGORIES = [
 ];
 
 const MAINTENANCE_CATEGORY_ITEMS: Record<string, string[]> = {
-  エンジン系: ["エンジンオイル", "オイル漏れ", "冷却水", "ファンベルト", "異音・振動"],
-  動力伝達系: ["クラッチ", "ミッション", "プロペラシャフト", "デフ", "異音・振動"],
-  "足回り・ステアリング": ["タイヤ摩耗", "空気圧", "ハブ・ベアリング", "ステアリング操作", "サスペンション"],
-  ブレーキ系: ["ブレーキパッド", "ブレーキライニング", "ブレーキ液", "エア漏れ", "制動力"],
-  電気系: ["バッテリー", "セルモーター", "オルタネータ", "灯火類", "配線・接触不良"],
+  "エンジン系": ["エンジンオイル", "オイル漏れ", "冷却水", "ファンベルト", "エアフィルター", "異音・振動"],
+  "動力伝達系": ["クラッチ", "ミッション", "プロペラシャフト", "デフ", "グリスアップ", "異音・振動"],
+  "足回り・ステアリング": ["タイヤ摩耗", "タイヤローテーション", "空気圧", "ハブ・ベアリング", "グリスアップ", "ステアリング操作", "サスペンション"],
+  "ブレーキ系": ["ブレーキパッド", "ブレーキライニング", "ブレーキ液", "エア漏れ", "制動力"],
+  "電気系": ["バッテリー", "セルモーター", "オルタネータ", "灯火類", "配線・接触不良"],
   "ボディ・外装": ["ミラー", "ワイパー", "ガラス", "ボディ損傷", "荷台・架装"],
-  その他: ["その他点検項目1", "その他点検項目2", "その他点検項目3"],
+  "その他": ["その他点検項目1", "その他点検項目2", "その他点検項目3"],
 };
 
 const MAINTENANCE_CONDITIONS = [
@@ -71,35 +60,85 @@ const MAINTENANCE_ACTIONS = [
   { value: "other", label: "その他" },
 ] as const;
 
-const MAINTENANCE_CATEGORY_TO_ENUM: Record<string, "engine" | "drivetrain" | "suspension" | "brake" | "electrical" | "body" | "other"> = {
-  エンジン系: "engine",
-  動力伝達系: "drivetrain",
-  "足回り・ステアリング": "suspension",
-  ブレーキ系: "brake",
-  電気系: "electrical",
-  "ボディ・外装": "body",
-  その他: "other",
+// 点検項目ごとの関連する状態・処置オプション（整備士監修）
+const ITEM_CONDITION_MAP: Record<string, readonly string[]> = {
+  "エンジンオイル":       ["normal","worn","leaking","other"],
+  "オイル漏れ":           ["normal","leaking","other"],
+  "冷却水":               ["normal","worn","leaking","other"],
+  "ファンベルト":         ["normal","worn","cracked","damaged"],
+  "エアフィルター":       ["normal","worn","other"],
+  "異音・振動":           ["normal","other"],
+  "タイヤ摩耗":           ["normal","worn","damaged","cracked"],
+  "空気圧":               ["normal","other"],
+  "ハブ・ベアリング":     ["normal","worn","damaged"],
+  "ステアリング操作":     ["normal","other"],
+  "サスペンション":       ["normal","damaged","leaking","other"],
+  "クラッチ":             ["normal","worn","other"],
+  "ミッション":           ["normal","worn","leaking","other"],
+  "プロペラシャフト":     ["normal","damaged","other"],
+  "デフ":                 ["normal","worn","leaking","other"],
+  "ブレーキパッド":       ["normal","worn","damaged"],
+  "ブレーキライニング":   ["normal","worn","damaged"],
+  "ブレーキ液":           ["normal","worn","leaking","other"],
+  "エア漏れ":             ["normal","leaking","other"],
+  "制動力":               ["normal","other"],
+  "バッテリー":           ["normal","worn","other"],
+  "灯火類":               ["normal","bulb_out","damaged"],
+  "ボディ損傷":           ["normal","damaged","cracked","other"],
+  "グリスアップ":         ["normal","worn","other"],
+  "タイヤローテーション": ["normal","other"],
+  "ミラー":               ["normal","damaged","other"],
+  "ワイパー":             ["normal","worn","damaged","other"],
+  "ガラス":               ["normal","damaged","cracked","other"],
+  "荷台・架装":           ["normal","damaged","other"],
+  "セルモーター":         ["normal","damaged","other"],
+  "オルタネータ":         ["normal","worn","damaged","other"],
+  "配線・接触不良":       ["normal","damaged","other"],
 };
 
-const MAINTENANCE_PURPOSE_TO_ENUM: Record<
-  string,
-  | "legal_inspection_3month"
-  | "legal_inspection_12month"
-  | "vehicle_inspection"
-  | "general_repair"
-  | "scheduled_maintenance"
-  | "accident_repair"
-  | "roadside_repair"
-  | "other"
-> = {
-  "3カ月法定点検": "legal_inspection_3month",
-  "12カ月法定点検": "legal_inspection_12month",
-  車検整備: "vehicle_inspection",
-  一般修理: "general_repair",
-  定期整備: "scheduled_maintenance",
-  事故修理: "accident_repair",
-  路上修理: "roadside_repair",
-  その他: "other",
+const ITEM_ACTION_MAP: Record<string, readonly string[]> = {
+  "エンジンオイル":       ["inspection_only","parts_replacement","observation"],
+  "オイル漏れ":           ["inspection_only","repair","observation"],
+  "冷却水":               ["inspection_only","parts_replacement","observation"],
+  "ファンベルト":         ["inspection_only","adjustment","parts_replacement"],
+  "エアフィルター":       ["inspection_only","cleaning","parts_replacement"],
+  "異音・振動":           ["inspection_only","repair","observation"],
+  "タイヤ摩耗":           ["inspection_only","parts_replacement","adjustment"],
+  "空気圧":               ["inspection_only","adjustment"],
+  "ハブ・ベアリング":     ["inspection_only","lubrication","parts_replacement"],
+  "ステアリング操作":     ["inspection_only","adjustment","repair"],
+  "サスペンション":       ["inspection_only","repair","parts_replacement"],
+  "クラッチ":             ["inspection_only","adjustment","parts_replacement"],
+  "ミッション":           ["inspection_only","repair","observation"],
+  "プロペラシャフト":     ["inspection_only","lubrication","repair"],
+  "デフ":                 ["inspection_only","parts_replacement","observation"],
+  "ブレーキパッド":       ["inspection_only","parts_replacement"],
+  "ブレーキライニング":   ["inspection_only","parts_replacement"],
+  "ブレーキ液":           ["inspection_only","parts_replacement"],
+  "エア漏れ":             ["inspection_only","repair","observation"],
+  "制動力":               ["inspection_only","adjustment","repair"],
+  "バッテリー":           ["inspection_only","parts_replacement","observation"],
+  "灯火類":               ["inspection_only","parts_replacement"],
+  "ボディ損傷":           ["inspection_only","repair","observation"],
+  "グリスアップ":         ["lubrication","inspection_only"],
+  "タイヤローテーション": ["adjustment","inspection_only"],
+  "ミラー":               ["inspection_only","parts_replacement","repair"],
+  "ワイパー":             ["inspection_only","parts_replacement"],
+  "ガラス":               ["inspection_only","repair","parts_replacement"],
+  "荷台・架装":           ["inspection_only","repair","observation"],
+  "セルモーター":         ["inspection_only","repair","parts_replacement"],
+  "オルタネータ":         ["inspection_only","repair","parts_replacement","observation"],
+  "配線・接触不良":       ["inspection_only","repair","observation"],
+};
+
+const MAINTENANCE_CATEGORY_TO_ENUM: Record<string, "engine" | "drivetrain" | "suspension" | "brake" | "electrical" | "body" | "other"> = {
+  "エンジン系": "engine",
+  "動力伝達系": "drivetrain",
+  "足回り・ステアリング": "suspension",
+  "ブレーキ系": "brake",
+  "電気系": "electrical",
+  "ボディ・外装": "body",
+  "その他": "other",
 };
 
 const MAINTENANCE_ENUM_TO_CATEGORY_LABEL: Record<
@@ -132,7 +171,7 @@ const MAINTENANCE_ENUM_TO_PURPOSE_LABEL: Record<
   general_repair: "一般修理",
   scheduled_maintenance: "定期整備",
   accident_repair: "事故修理",
-  roadside_repair: "路上修理",
+  roadside_repair: "路上修理（緊急）",
   other: "その他",
 };
 
@@ -143,6 +182,187 @@ const PART_MASTER_CATEGORY_OPTIONS = [
   { value: "repair_work", label: "修理作業" },
   { value: "exterior", label: "外注" },
 ] as const;
+
+// 拠点・車番
+const VEHICLE_BASE_OPTIONS = ["関東", "本社", "東大阪", "名古屋", "静岡"] as const;
+const VEHICLE_BASE_DEFAULT = "関東";
+const VEHICLE_NUMBER_PREFIX_OPTIONS = ["大宮", "大阪", "一宮", "静岡"] as const;
+const VEHICLE_NUMBER_PREFIX_DEFAULT = "大宮";
+
+// 車種
+const VEHICLE_TYPE_OPTIONS = [
+  { value: "2t", label: "2t" },
+  { value: "4t", label: "4t" },
+  { value: "8t", label: "8t" },
+  { value: "10t", label: "10t" },
+  { value: "trailer_head", label: "トレーラーヘッド" },
+  { value: "chassis", label: "シャーシ" },
+  { value: "other", label: "その他" },
+] as const;
+
+// 入庫目的グループ
+const MAINTENANCE_PURPOSE_GROUPS = [
+  {
+    label: "法定点検",
+    items: ["3カ月法定点検", "6カ月法定点検", "12カ月法定点検", "車検整備"],
+  },
+  {
+    label: "定期メンテナンス",
+    items: [
+      "定期オイルフィルター交換",
+      "定期タイヤ交換・ローテーション",
+      "定期ブレーキ点検・調整",
+      "クーラント交換",
+      "エアフィルター交換",
+      "バッテリー点検・交換",
+      "ベルト類点検・交換",
+    ],
+  },
+  {
+    label: "修理・緊急対応",
+    items: ["一般修理", "事故修理", "路上修理（緊急）", "部品交換（故障）"],
+  },
+  {
+    label: "その他",
+    items: ["その他"],
+  },
+] as const;
+
+const MAINTENANCE_PURPOSES: string[] = MAINTENANCE_PURPOSE_GROUPS.flatMap((g) => [...g.items]);
+
+// 入庫目的 → enum マッピング
+const MAINTENANCE_PURPOSE_TO_ENUM: Record<
+  string,
+  | "legal_inspection_3month"
+  | "legal_inspection_12month"
+  | "vehicle_inspection"
+  | "general_repair"
+  | "scheduled_maintenance"
+  | "accident_repair"
+  | "roadside_repair"
+  | "other"
+> = {
+  "3カ月法定点検": "legal_inspection_3month",
+  "6カ月法定点検": "legal_inspection_3month",
+  "12カ月法定点検": "legal_inspection_12month",
+  "車検整備": "vehicle_inspection",
+  "定期オイルフィルター交換": "scheduled_maintenance",
+  "定期タイヤ交換・ローテーション": "scheduled_maintenance",
+  "定期ブレーキ点検・調整": "scheduled_maintenance",
+  "クーラント交換": "scheduled_maintenance",
+  "エアフィルター交換": "scheduled_maintenance",
+  "バッテリー点検・交換": "scheduled_maintenance",
+  "ベルト類点検・交換": "scheduled_maintenance",
+  "一般修理": "general_repair",
+  "事故修理": "accident_repair",
+  "路上修理（緊急）": "roadside_repair",
+  "部品交換（故障）": "general_repair",
+  "その他": "other",
+};
+
+// タイヤ位置
+const TIRE_POSITIONS = ["FL", "FR", "RL-内", "RL-外", "RR-内", "RR-外", "スペア", "全輪"] as const;
+const TIRE_PART_NAMES = ["タイヤ", "ブレーキパッド", "ブレーキライニング", "ハブベアリング"];
+
+// 点検項目ごとの部品サジェスト
+const INSPECTION_ITEM_PART_SUGGESTIONS: Record<
+  string,
+  { masterCategory: "oil_fluid" | "consumable" | "misc" | "repair_work" | "exterior"; partName: string; unit: string }[]
+> = {
+  "エンジンオイル": [
+    { masterCategory: "oil_fluid", partName: "エンジンオイル", unit: "L" },
+    { masterCategory: "consumable", partName: "オイルフィルター", unit: "個" },
+  ],
+  "オイル漏れ": [{ masterCategory: "repair_work", partName: "オイルシール", unit: "個" }],
+  "冷却水": [{ masterCategory: "oil_fluid", partName: "LLC（クーラント）", unit: "L" }],
+  "ファンベルト": [{ masterCategory: "consumable", partName: "ファンベルト", unit: "本" }],
+  "クラッチ": [{ masterCategory: "consumable", partName: "クラッチディスク", unit: "枚" }],
+  "タイヤ摩耗": [{ masterCategory: "consumable", partName: "タイヤ", unit: "本" }],
+  "空気圧": [],
+  "ブレーキパッド": [{ masterCategory: "consumable", partName: "ブレーキパッド", unit: "枚" }],
+  "ブレーキライニング": [{ masterCategory: "consumable", partName: "ブレーキライニング", unit: "枚" }],
+  "ブレーキ液": [{ masterCategory: "oil_fluid", partName: "ブレーキフルード", unit: "L" }],
+  "バッテリー": [
+    { masterCategory: "consumable", partName: "バッテリー", unit: "個" },
+    { masterCategory: "oil_fluid", partName: "バッテリー補充液", unit: "L" },
+  ],
+  "灯火類": [{ masterCategory: "consumable", partName: "バルブ", unit: "個" }],
+  "エアフィルター": [{ masterCategory: "consumable", partName: "エアフィルター", unit: "個" }],
+  "ボディ損傷": [{ masterCategory: "exterior", partName: "板金・塗装", unit: "式" }],
+  "グリスアップ": [{ masterCategory: "oil_fluid", partName: "グリス", unit: "g" }],
+  "タイヤローテーション": [],
+};
+
+// 点検項目ごとの測定値定義
+const INSPECTION_ITEM_MEASUREMENTS: Record<string, { label: string; unit: string }> = {
+  "ブレーキパッド": { label: "残厚", unit: "mm" },
+  "ブレーキライニング": { label: "残厚", unit: "mm" },
+  "タイヤ摩耗": { label: "残溝", unit: "mm" },
+  "空気圧": { label: "空気圧", unit: "kPa" },
+  "バッテリー": { label: "電圧", unit: "V" },
+};
+
+// 点検項目ごとのデフォルト状態
+const INSPECTION_ITEM_CONDITION: Record<
+  string,
+  "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other"
+> = {
+  "エンジンオイル": "normal",
+  "オイル漏れ": "leaking",
+  "冷却水": "normal",
+  "タイヤ摩耗": "worn",
+  "ブレーキパッド": "worn",
+  "ブレーキライニング": "worn",
+  "ボディ損傷": "damaged",
+  "灯火類": "bulb_out",
+};
+
+const CONDITION_SEVERITY: Record<string, number> = {
+  normal: 0,
+  worn: 1,
+  damaged: 2,
+  cracked: 2,
+  leaking: 3,
+  bulb_out: 1,
+  other: 1,
+};
+
+// 入庫目的ごとのデフォルト整備明細設定
+const PURPOSE_DETAIL_DEFAULTS: Record<
+  string,
+  {
+    noIssue: boolean;
+    category?: string;
+    detailInspectionItems?: string[];
+    condition?: "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other";
+    action?: "inspection_only" | "cleaning" | "adjustment" | "lubrication" | "parts_replacement" | "repair" | "observation" | "other";
+    emergency?: boolean;
+    requiresAttention?: boolean;
+  }
+> = {
+  "3カ月法定点検": { noIssue: true, condition: "normal", action: "inspection_only" },
+  "6カ月法定点検": { noIssue: true, condition: "normal", action: "inspection_only" },
+  "12カ月法定点検": { noIssue: true, condition: "normal", action: "inspection_only" },
+  "車検整備": { noIssue: true, condition: "normal", action: "inspection_only" },
+  "定期オイルフィルター交換": { noIssue: false, category: "エンジン系", detailInspectionItems: ["エンジンオイル"], condition: "normal", action: "parts_replacement" },
+  "定期タイヤ交換・ローテーション": { noIssue: false, category: "足回り・ステアリング", detailInspectionItems: ["タイヤ摩耗"], condition: "worn", action: "parts_replacement" },
+  "定期ブレーキ点検・調整": { noIssue: false, category: "ブレーキ系", detailInspectionItems: ["ブレーキパッド"], condition: "worn", action: "adjustment" },
+  "クーラント交換": { noIssue: false, category: "エンジン系", detailInspectionItems: ["冷却水"], condition: "normal", action: "parts_replacement" },
+  "エアフィルター交換": { noIssue: false, category: "エンジン系", detailInspectionItems: ["エアフィルター"], condition: "worn", action: "parts_replacement" },
+  "バッテリー点検・交換": { noIssue: false, category: "電気系", detailInspectionItems: ["バッテリー"], condition: "worn", action: "parts_replacement" },
+  "ベルト類点検・交換": { noIssue: false, category: "エンジン系", detailInspectionItems: ["ファンベルト"], condition: "worn", action: "parts_replacement" },
+  "一般修理": { noIssue: false, condition: "damaged", action: "repair" },
+  "事故修理": { noIssue: false, condition: "damaged", action: "repair", emergency: true },
+  "路上修理（緊急）": { noIssue: false, condition: "damaged", action: "repair", emergency: true, requiresAttention: true },
+  "部品交換（故障）": { noIssue: false, condition: "damaged", action: "parts_replacement" },
+};
+
+const OVERALL_JUDGMENT_OPTIONS = [
+  { value: "good" as const, label: "良好", activeClass: "bg-emerald-500 text-white border-emerald-500", inactiveClass: "border-emerald-200 text-emerald-700 hover:bg-emerald-50" },
+  { value: "caution" as const, label: "要注意", activeClass: "bg-yellow-400 text-white border-yellow-400", inactiveClass: "border-yellow-200 text-yellow-700 hover:bg-yellow-50" },
+  { value: "next_service" as const, label: "次回要整備", activeClass: "bg-orange-500 text-white border-orange-500", inactiveClass: "border-orange-200 text-orange-700 hover:bg-orange-50" },
+  { value: "no_drive" as const, label: "運行不可", activeClass: "bg-red-600 text-white border-red-600", inactiveClass: "border-red-200 text-red-700 hover:bg-red-50" },
+];
 
 interface TaskForm {
   vehicleNumber: string;
@@ -159,9 +379,15 @@ interface WorkBlockForm {
 
 interface MaintenanceDetailForm {
   category: string;
+  categoryOther: string;
   inspectionItems: string[];
+  inspectionItemOther: string;
   note: string;
   noIssue: boolean;
+  noIssueItems: string[];
+  itemDetails: Record<string, { condition: MaintenanceDetailForm["condition"]; action: MaintenanceDetailForm["action"] }>;
+  requiresAttention: boolean;
+  measurements: Record<string, string>;
   condition: "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other";
   action: "inspection_only" | "cleaning" | "adjustment" | "lubrication" | "parts_replacement" | "repair" | "observation" | "other";
   parts: {
@@ -170,6 +396,7 @@ interface MaintenanceDetailForm {
     quantity: string;
     unit: string;
     position: string;
+    linkedItem?: string;
   }[];
   photos: {
     fileName: string;
@@ -180,12 +407,25 @@ interface MaintenanceDetailForm {
 
 interface MaintenanceVehicleForm {
   vehicleType: string;
+  vehicleTypeOther: string;
+  vehicleBase: string;
+  vehicleNumberPrefix: string;
   vehicleName: string;
   purpose: string;
+  purposeOther: string;
   mileageKm: string;
   workStart: string;
   workEnd: string;
   emergency: boolean;
+  overallJudgment: "" | "good" | "caution" | "next_service" | "no_drive";
+  completionChecks: {
+    engineStart: boolean;
+    testDrive: boolean;
+    noLeaks: boolean;
+    lights: boolean;
+  };
+  outsourceVendor: string;
+  outsourceStatus: "" | "pending" | "completed";
   details: MaintenanceDetailForm[];
 }
 
@@ -208,6 +448,68 @@ const initialFormData = (today: string, department?: string) => ({
   breakEnd: "13:00",
 });
 
+const emptyDetail = (): MaintenanceDetailForm => ({
+  category: "",
+  categoryOther: "",
+  inspectionItems: [],
+  inspectionItemOther: "",
+  note: "",
+  noIssue: true,
+  noIssueItems: [],
+  itemDetails: {},
+  requiresAttention: false,
+  measurements: {},
+  condition: "normal",
+  action: "inspection_only",
+  parts: [],
+  photos: [],
+});
+
+const emptyVehicle = (): MaintenanceVehicleForm => ({
+  vehicleType: "",
+  vehicleTypeOther: "",
+  vehicleBase: VEHICLE_BASE_DEFAULT,
+  vehicleNumberPrefix: VEHICLE_NUMBER_PREFIX_DEFAULT,
+  vehicleName: "",
+  purpose: "",
+  purposeOther: "",
+  mileageKm: "",
+  workStart: "",
+  workEnd: "",
+  emergency: false,
+  overallJudgment: "",
+  completionChecks: { engineStart: false, testDrive: false, noLeaks: false, lights: false },
+  outsourceVendor: "",
+  outsourceStatus: "",
+  details: [emptyDetail()],
+});
+
+const calcWorkDuration = (start: string, end: string): string => {
+  if (!start || !end) return "--";
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const total = eh * 60 + em - (sh * 60 + sm);
+  if (total <= 0) return "--";
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
+};
+
+const getAutoConditionForItems = (
+  inspectionItems: string[]
+): "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other" | null => {
+  let worst: "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other" | null = null;
+  let worstSev = -1;
+  for (const item of inspectionItems) {
+    const cond = INSPECTION_ITEM_CONDITION[item];
+    if (cond && (CONDITION_SEVERITY[cond] ?? 0) > worstSev) {
+      worstSev = CONDITION_SEVERITY[cond] ?? 0;
+      worst = cond;
+    }
+  }
+  return worst;
+};
+
 export default function ReportNew() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
@@ -227,16 +529,7 @@ export default function ReportNew() {
     { department: user?.department ?? "maintenance", start: "08:00", end: "17:00" },
   ]);
   const [maintenanceVehicles, setMaintenanceVehicles] = useState<MaintenanceVehicleForm[]>([
-    {
-      vehicleType: "",
-      vehicleName: "",
-      purpose: "",
-      mileageKm: "",
-      workStart: "",
-      workEnd: "",
-      emergency: false,
-      details: [{ category: "", inspectionItems: [], note: "", noIssue: true, condition: "normal", action: "inspection_only", parts: [], photos: [] }],
-    },
+    emptyVehicle(),
   ]);
   const [maintenanceMemo, setMaintenanceMemo] = useState("");
   const draftStorageKey = user?.id ? `reportNewDraft:${user.id}` : null;
@@ -273,17 +566,31 @@ export default function ReportNew() {
       const vehicles: MaintenanceVehicleForm[] = [
         {
           vehicleType: report.vehicleType ?? "",
+          vehicleTypeOther: "",
+          vehicleBase: VEHICLE_BASE_DEFAULT,
+          vehicleNumberPrefix: VEHICLE_NUMBER_PREFIX_DEFAULT,
           vehicleName: report.vehicleNumber ?? "",
           purpose: MAINTENANCE_ENUM_TO_PURPOSE_LABEL[report.workCategory] ?? "その他",
+          purposeOther: "",
           mileageKm: report.odometer ? String(report.odometer) : "",
-          workStart: report.workStartTime ?? "",
-          workEnd: report.workEndTime ?? "",
+          workStart: "",
+          workEnd: "",
           emergency: Boolean(report.isAccident),
+          overallJudgment: "",
+          completionChecks: { engineStart: false, testDrive: false, noLeaks: false, lights: false },
+          outsourceVendor: "",
+          outsourceStatus: "",
           details: (lastMaintenanceReport.details ?? []).map((detail) => ({
             category: MAINTENANCE_ENUM_TO_CATEGORY_LABEL[detail.partCategory] ?? "その他",
+            categoryOther: "",
             inspectionItems: [],
+            inspectionItemOther: "",
             note: detail.notes ?? detail.actionNote ?? detail.conditionNote ?? "",
             noIssue: detail.condition === "normal" && detail.action === "inspection_only",
+            noIssueItems: [],
+            itemDetails: {},
+            requiresAttention: false,
+            measurements: {},
             condition: detail.condition,
             action: detail.action,
             parts: (detail.parts ?? []).map((p) => ({
@@ -301,12 +608,7 @@ export default function ReportNew() {
       setMaintenanceVehicles(
         vehicles[0].details.length > 0
           ? vehicles
-          : [
-              {
-                ...vehicles[0],
-                details: [{ category: "", inspectionItems: [], note: "", noIssue: true, condition: "normal", action: "inspection_only", parts: [], photos: [] }],
-              },
-            ]
+          : [{ ...vehicles[0], details: [emptyDetail()] }]
       );
       setWorkBlocks([
         {
@@ -354,6 +656,9 @@ export default function ReportNew() {
 
   const updateWorkBlock = (index: number, field: keyof WorkBlockForm, value: string) => {
     setWorkBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, [field]: value } : b)));
+    if (index === 0 && field === "department") {
+      setFormData((p) => ({ ...p, department: value }));
+    }
   };
 
   const addWorkBlock = () => {
@@ -364,26 +669,18 @@ export default function ReportNew() {
     setWorkBlocks((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateVehicle = (index: number, field: keyof MaintenanceVehicleForm, value: string | boolean) => {
+  const updateVehicle = (
+    index: number,
+    field: keyof MaintenanceVehicleForm,
+    value: string | boolean | MaintenanceVehicleForm["completionChecks"]
+  ) => {
     setMaintenanceVehicles((prev) =>
-      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
+      prev.map((v, i) => (i === index ? ({ ...v, [field]: value } as MaintenanceVehicleForm) : v))
     );
   };
 
   const addVehicle = () => {
-    setMaintenanceVehicles((prev) => [
-      ...prev,
-      {
-        vehicleType: "",
-        vehicleName: "",
-        purpose: "",
-        mileageKm: "",
-        workStart: "",
-        workEnd: "",
-        emergency: false,
-        details: [{ category: "", inspectionItems: [], note: "", noIssue: true, condition: "normal", action: "inspection_only", parts: [], photos: [] }],
-      },
-    ]);
+    setMaintenanceVehicles((prev) => [...prev, emptyVehicle()]);
   };
 
   const removeVehicle = (index: number) => {
@@ -394,14 +691,16 @@ export default function ReportNew() {
     vehicleIndex: number,
     detailIndex: number,
     field: keyof MaintenanceDetailForm,
-    value: string | boolean | string[]
+    value: string | boolean | string[] | Record<string, string>
   ) => {
     setMaintenanceVehicles((prev) =>
       prev.map((v, i) =>
         i === vehicleIndex
           ? {
               ...v,
-              details: v.details.map((d, j) => (j === detailIndex ? { ...d, [field]: value } : d)),
+              details: v.details.map((d, j) =>
+                j === detailIndex ? ({ ...d, [field]: value } as MaintenanceDetailForm) : d
+              ),
             }
           : v
       )
@@ -416,9 +715,34 @@ export default function ReportNew() {
               ...v,
               details: [
                 ...v.details,
-                { category: "", inspectionItems: [], note: "", noIssue: false, condition: "other", action: "repair", parts: [], photos: [] },
+                {
+                  category: "",
+                  categoryOther: "",
+                  inspectionItems: [],
+                  inspectionItemOther: "",
+                  note: "",
+                  noIssue: false,
+                  noIssueItems: [],
+                  itemDetails: {},
+                  requiresAttention: false,
+                  measurements: {},
+                  condition: "other" as const,
+                  action: "repair" as const,
+                  parts: [],
+                  photos: [],
+                },
               ],
             }
+          : v
+      )
+    );
+  };
+
+  const removeVehicleDetail = (vehicleIndex: number, detailIndex: number) => {
+    setMaintenanceVehicles((prev) =>
+      prev.map((v, i) =>
+        i === vehicleIndex
+          ? { ...v, details: v.details.filter((_, j) => j !== detailIndex) }
           : v
       )
     );
@@ -436,7 +760,7 @@ export default function ReportNew() {
                       ...d,
                       parts: [
                         ...(d.parts ?? []),
-                        { masterCategory: "consumable", partName: "", quantity: "1", unit: "個", position: "" },
+                        { masterCategory: "consumable" as const, partName: "", quantity: "1", unit: "個", position: "" },
                       ],
                     }
                   : d
@@ -555,6 +879,82 @@ export default function ReportNew() {
       .catch((e: Error) => toast.error(e.message));
   };
 
+  const syncSuggestedPartsByInspectionItems = (vi: number, di: number, inspectionItems: string[]) => {
+    const allSuggestions = inspectionItems.flatMap((item) =>
+      (INSPECTION_ITEM_PART_SUGGESTIONS[item] ?? []).map((s) => ({ ...s, linkedItem: item }))
+    );
+    const seen = new Set<string>();
+    const parts = allSuggestions
+      .filter((s) => {
+        if (seen.has(s.partName)) return false;
+        seen.add(s.partName);
+        return true;
+      })
+      .map((s) => ({
+        masterCategory: s.masterCategory,
+        partName: s.partName,
+        quantity: "1",
+        unit: s.unit,
+        position: "",
+        linkedItem: s.linkedItem,
+      }));
+
+    const autoCondition = getAutoConditionForItems(inspectionItems);
+
+    setMaintenanceVehicles((prev) =>
+      prev.map((v, i) =>
+        i === vi
+          ? {
+              ...v,
+              details: v.details.map((d, j) =>
+                j === di
+                  ? {
+                      ...d,
+                      inspectionItems,
+                      noIssue: inspectionItems.length > 0 ? false : d.noIssue,
+                      parts: parts.length > 0
+                        ? [
+                            ...parts,
+                            // preserve manually added parts (no linkedItem)
+                            ...d.parts.filter((p) => !p.linkedItem),
+                          ]
+                        : d.parts,
+                      condition: autoCondition !== null ? autoCondition : d.condition,
+                    }
+                  : d
+              ),
+            }
+          : v
+      )
+    );
+  };
+
+  const selectPurposeWithDefaults = (vi: number, purpose: string) => {
+    const defaults = PURPOSE_DETAIL_DEFAULTS[purpose];
+    setMaintenanceVehicles((prev) =>
+      prev.map((v, i) => {
+        if (i !== vi) return v;
+        const updatedVehicle: MaintenanceVehicleForm = {
+          ...v,
+          purpose,
+          emergency: defaults?.emergency ?? v.emergency,
+        };
+        if (defaults) {
+          updatedVehicle.details = v.details.map((d) => ({
+            ...d,
+            noIssue: defaults.noIssue,
+            condition: defaults.condition ?? d.condition,
+            action: defaults.action ?? d.action,
+            ...(defaults.category ? { category: defaults.category } : {}),
+            ...(defaults.detailInspectionItems ? { inspectionItems: [...defaults.detailInspectionItems] } : {}),
+            ...(defaults.requiresAttention !== undefined ? { requiresAttention: defaults.requiresAttention } : {}),
+          }));
+        }
+        return updatedVehicle;
+      })
+    );
+  };
+
   const validateBeforeSubmit = (): string | null => {
     if (!formData.workDate) return "作業日を入力してください";
     if (!formData.department) return "部署を選択してください";
@@ -587,6 +987,7 @@ export default function ReportNew() {
       if (hasOversizePhoto) {
         return "1MBを超える写真は添付できません";
       }
+
     } else {
       const hasTaskContent = tasks.some((t) => t.content.trim());
       if (!hasTaskContent) return "作業内容を1件以上入力してください";
@@ -607,13 +1008,40 @@ export default function ReportNew() {
       if (snapshot.maintenanceVehicles) {
         setMaintenanceVehicles(
           snapshot.maintenanceVehicles.map((v) => ({
-            ...v,
+            vehicleType: v.vehicleType ?? "",
+            vehicleTypeOther: v.vehicleTypeOther ?? "",
+            vehicleBase: v.vehicleBase ?? VEHICLE_BASE_DEFAULT,
+            vehicleNumberPrefix: v.vehicleNumberPrefix ?? VEHICLE_NUMBER_PREFIX_DEFAULT,
+            vehicleName: v.vehicleName ?? "",
+            purpose: v.purpose ?? "",
+            purposeOther: v.purposeOther ?? "",
+            mileageKm: v.mileageKm ?? "",
+            workStart: v.workStart ?? "",
+            workEnd: v.workEnd ?? "",
+            emergency: v.emergency ?? false,
+            overallJudgment: v.overallJudgment ?? "",
+            completionChecks: v.completionChecks ?? {
+              engineStart: false,
+              testDrive: false,
+              noLeaks: false,
+              lights: false,
+            },
+            outsourceVendor: v.outsourceVendor ?? "",
+            outsourceStatus: v.outsourceStatus ?? "",
             details: (v.details ?? []).map((d) => ({
-              ...d,
+              category: d.category ?? "",
+              categoryOther: d.categoryOther ?? "",
               inspectionItems: d.inspectionItems ?? [],
-              parts: d.parts ?? [],
+              inspectionItemOther: d.inspectionItemOther ?? "",
+              note: d.note ?? "",
+              noIssue: d.noIssue ?? true,
+              noIssueItems: d.noIssueItems ?? [],
+              itemDetails: d.itemDetails ?? {},
+              requiresAttention: d.requiresAttention ?? false,
+              measurements: d.measurements ?? {},
               condition: d.condition ?? (d.noIssue ? "normal" : "other"),
               action: d.action ?? (d.noIssue ? "inspection_only" : "repair"),
+              parts: d.parts ?? [],
               photos: [],
             })),
           }))
@@ -634,13 +1062,7 @@ export default function ReportNew() {
       workBlocks,
       maintenanceVehicles: maintenanceVehicles.map((v) => ({
         ...v,
-        details: v.details.map((d) => ({
-          ...d,
-          inspectionItems: d.inspectionItems ?? [],
-          condition: d.condition ?? (d.noIssue ? "normal" : "other"),
-          action: d.action ?? (d.noIssue ? "inspection_only" : "repair"),
-          photos: [],
-        })),
+        details: v.details.map((d) => ({ ...d, photos: [] })),
       })),
       maintenanceMemo,
     };
@@ -653,25 +1075,57 @@ export default function ReportNew() {
   const handleSubmit = (status: "draft" | "submitted") => {
     const validationError = validateBeforeSubmit();
     if (validationError) {
-      toast.error(validationError);
+      if (validationError !== "__cancelled__") toast.error(validationError);
       return;
     }
 
-    if (formData.department === "maintenance") {
+    if (formData.department === "maintenance" || isMaintenanceFlow) {
       const saveMaintenance = async () => {
         const firstVehicle = maintenanceVehicles[0];
+
+        const vehicleNotes = maintenanceVehicles
+          .map((v, idx) => {
+            const lines: string[] = [];
+            const judgmentLabel = OVERALL_JUDGMENT_OPTIONS.find((o) => o.value === v.overallJudgment)?.label;
+            if (judgmentLabel) lines.push(`総合判定: ${judgmentLabel}`);
+            // 要運行管理連絡フラグ
+            const attentionItems = v.details
+              .filter((d) => d.requiresAttention)
+              .map((d) => d.category || "不明");
+            if (attentionItems.length > 0) {
+              lines.push(`⚠ 要運行管理連絡: ${attentionItems.join(", ")}`);
+            }
+            const completedChecks = [
+              v.completionChecks.engineStart ? "エンジン始動OK" : null,
+              v.completionChecks.testDrive ? "試走OK" : null,
+              v.completionChecks.noLeaks ? "漏れなし確認OK" : null,
+              v.completionChecks.lights ? "灯火確認OK" : null,
+            ].filter((x): x is string => x !== null);
+            if (completedChecks.length > 0) lines.push(`完了確認: ${completedChecks.join(", ")}`);
+            if (v.outsourceVendor.trim()) {
+              lines.push(`外注: ${v.outsourceVendor}（${v.outsourceStatus === "completed" ? "完了" : "依頼中"}）`);
+            }
+            return lines.length > 0 ? `【車両${idx + 1}】${lines.join(" | ")}` : "";
+          })
+          .filter(Boolean)
+          .join("\n");
+
+        const fullNotes = [maintenanceMemo, vehicleNotes].filter(Boolean).join("\n") || null;
+
         const report = await createMaintenanceReportMutation.mutateAsync({
           vehicleType: firstVehicle?.vehicleType || null,
-          vehicleNumber: firstVehicle?.vehicleName || null,
+          vehicleNumber: firstVehicle
+            ? [firstVehicle.vehicleNumberPrefix, firstVehicle.vehicleName].filter(Boolean).join("") || null
+            : null,
           workCategory: MAINTENANCE_PURPOSE_TO_ENUM[firstVehicle?.purpose || "その他"] ?? "other",
           workCategoryNote:
-            firstVehicle?.purpose && firstVehicle.purpose !== "その他" ? null : firstVehicle?.purpose || null,
+            firstVehicle?.purpose === "その他" ? firstVehicle?.purposeOther || null : null,
           odometer: firstVehicle?.mileageKm ? Number(firstVehicle.mileageKm) : null,
           workStartTime: firstVehicle?.workStart || null,
           workEndTime: firstVehicle?.workEnd || null,
           workDate: formData.workDate,
           isAccident: maintenanceVehicles.some((v) => v.emergency),
-          notes: maintenanceMemo || null,
+          notes: fullNotes,
         });
 
         for (const vehicle of maintenanceVehicles) {
@@ -685,7 +1139,10 @@ export default function ReportNew() {
               action: detail.action,
               actionNote: detail.action === "other" ? detail.note || null : null,
               notes:
-                [detail.inspectionItems?.length ? `点検項目: ${detail.inspectionItems.join(" / ")}` : "", detail.note]
+                [
+                  detail.inspectionItems?.length ? `点検項目: ${detail.inspectionItems.join(" / ")}` : "",
+                  detail.note,
+                ]
                   .filter(Boolean)
                   .join("\n") || null,
               sortOrder: i,
@@ -753,7 +1210,10 @@ export default function ReportNew() {
                 .join("\n");
               const title = `${v.vehicleName || "車名未入力"} / ${v.purpose || "目的未設定"}`;
               const mileage = v.mileageKm ? `走行距離: ${v.mileageKm}km` : "走行距離: -";
-              const workTime = v.workStart || v.workEnd ? `作業時間: ${v.workStart || "--:--"}〜${v.workEnd || "--:--"}` : "";
+              const workTime =
+                v.workStart || v.workEnd
+                  ? `作業時間: ${v.workStart || "--:--"}〜${v.workEnd || "--:--"}`
+                  : "";
               return {
                 vehicleNumber: v.vehicleName || null,
                 taskType: "整備",
@@ -789,8 +1249,10 @@ export default function ReportNew() {
     });
   };
 
+  const isMaintenance = formData.department === "maintenance" || isMaintenanceFlow;
+
   return (
-    <div className="space-y-5 max-w-[860px] mx-auto">
+    <div className="space-y-5 max-w-[860px] mx-auto pb-32">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/reports")}>
           <ArrowLeft className="w-4 h-4" />
@@ -818,21 +1280,6 @@ export default function ReportNew() {
                 className="mt-1"
               />
             </div>
-            {!isMaintenanceFlow && (
-              <div>
-                <Label htmlFor="department">部署</Label>
-                <select
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData((p) => ({ ...p, department: e.target.value }))}
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {DEPARTMENT_OPTIONS.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
             {isMaintenanceFlow && (
               <div>
                 <Label>休憩時間</Label>
@@ -878,7 +1325,7 @@ export default function ReportNew() {
               </div>
             </div>
           )}
-          {(formData.department === "maintenance" || isMaintenanceFlow) && (
+          {isMaintenance && (
             <div className="rounded-lg border bg-muted/20 p-3">
               <p className="text-xs text-muted-foreground font-medium mb-2">実績サマリー（自動集計）</p>
               <div className="grid grid-cols-2 gap-3">
@@ -965,407 +1412,989 @@ export default function ReportNew() {
         </CardContent>
       </Card>
 
-      {formData.department === "maintenance" || isMaintenanceFlow ? (
+      {isMaintenance ? (
         <>
+          {/* 車両別整備記録 */}
           <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">🚚 車両別整備記録</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void applyLastMaintenanceReport()}
-                  disabled={isLoadingLastMaintenance}
-                  className="gap-1"
-                >
-                  前回を反映
-                </Button>
-                <Button variant="outline" size="sm" onClick={addVehicle} className="gap-1">
-                  <Plus className="w-4 h-4" />
-                  車両を追加
-                </Button>
-              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent
+              className="space-y-3"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const target = e.target as HTMLElement;
+                if (target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+                if (target.tagName === "INPUT") {
+                  e.preventDefault();
+                  const focusable = Array.from(
+                    e.currentTarget.querySelectorAll<HTMLElement>(
+                      "input:not([disabled]):not([type='checkbox']), select:not([disabled]), textarea:not([disabled])"
+                    )
+                  );
+                  const idx = focusable.indexOf(target);
+                  if (idx >= 0 && idx < focusable.length - 1) focusable[idx + 1].focus();
+                }
+              }}
+            >
               {maintenanceVehicles.map((vehicle, vi) => (
                 <div key={vi} className="border border-sky-200 rounded-xl p-3.5 space-y-3 bg-sky-50/20">
+                  {/* A) 車両ヘッダー */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-sky-900">🚚 車両 {vi + 1}</p>
-                    {maintenanceVehicles.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => removeVehicle(vi)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      {maintenanceVehicles.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => removeVehicle(vi)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* B) 車種 */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs w-16 text-right shrink-0">車種 *</Label>
+                    <select
+                      value={vehicle.vehicleType}
+                      onChange={(e) => updateVehicle(vi, "vehicleType", e.target.value)}
+                      className="flex h-9 w-44 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="">選択</option>
+                      {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    {vehicle.vehicleType === "other" && (
+                      <Input
+                        placeholder="車種を入力"
+                        value={vehicle.vehicleTypeOther}
+                        onChange={(e) => updateVehicle(vi, "vehicleTypeOther", e.target.value)}
+                        className="h-9 text-sm flex-1"
+                      />
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">車種 *</Label>
-                      <select
-                        value={vehicle.vehicleType}
-                        onChange={(e) => updateVehicle(vi, "vehicleType", e.target.value)}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">車種を選択</option>
-                        <option value="tractor">トラクタ</option>
-                        <option value="trailer">トレーラー</option>
-                        <option value="truck">トラック</option>
-                        <option value="other">その他</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">作業時間</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="justify-start gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 h-9"
-                          onClick={() => updateVehicle(vi, "workStart", nowTime())}
-                        >
-                          <Play className="w-4 h-4 text-blue-600" />
-                          作業開始{vehicle.workStart ? ` ${vehicle.workStart}` : ""}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="justify-start gap-2 border-orange-200 text-orange-700 hover:bg-orange-50 h-9"
-                          onClick={() => updateVehicle(vi, "workEnd", nowTime())}
-                        >
-                          <Square className="w-4 h-4 text-orange-600" />
-                          作業終了{vehicle.workEnd ? ` ${vehicle.workEnd}` : ""}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">車番・車名 *</Label>
-                    <Input
-                      placeholder="例: 2154、○○号車"
-                      value={vehicle.vehicleName}
-                      onChange={(e) => updateVehicle(vi, "vehicleName", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">入庫目的 *</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {MAINTENANCE_PURPOSES.map((purpose) => (
-                        <button
-                          key={purpose}
-                          type="button"
-                          onClick={() => updateVehicle(vi, "purpose", purpose)}
-                          className={`h-10 rounded-lg border text-sm ${
-                            vehicle.purpose === purpose
-                              ? "border-blue-300 bg-blue-50 text-blue-700"
-                              : "border-input hover:bg-muted/40"
-                          }`}
-                        >
-                          {purpose}
-                        </button>
+                  {/* C) 拠点・車番 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="text-xs w-16 text-right shrink-0">拠点</Label>
+                    <select
+                      value={vehicle.vehicleBase}
+                      onChange={(e) => updateVehicle(vi, "vehicleBase", e.target.value)}
+                      className="flex h-9 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    >
+                      {VEHICLE_BASE_OPTIONS.map((b) => (
+                        <option key={b} value={b}>{b}</option>
                       ))}
-                    </div>
+                    </select>
+                    <Label className="text-xs shrink-0">車番 *</Label>
+                    <select
+                      value={vehicle.vehicleNumberPrefix}
+                      onChange={(e) => updateVehicle(vi, "vehicleNumberPrefix", e.target.value)}
+                      className="flex h-9 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    >
+                      {VEHICLE_NUMBER_PREFIX_OPTIONS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <Input
+                      placeholder="番号"
+                      value={vehicle.vehicleName}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^\x21-\x7E]/g, "");
+                        updateVehicle(vi, "vehicleName", val);
+                      }}
+                      className="h-9 text-sm w-24"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {/* D) 走行距離 */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs w-16 text-right shrink-0">走行距離</Label>
                     <Input
-                      placeholder="走行距離（km）"
-                      value={vehicle.mileageKm}
-                      onChange={(e) => updateVehicle(vi, "mileageKm", e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={vehicle.mileageKm ? Number(vehicle.mileageKm).toLocaleString("ja-JP") : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        updateVehicle(vi, "mileageKm", raw);
+                      }}
+                      className="h-9 text-sm w-32"
                     />
+                    <span className="text-sm text-muted-foreground">km</span>
                   </div>
-                  <label className="h-10 border border-rose-200 bg-rose-50 rounded-md px-3 flex items-center gap-2 text-sm text-rose-700">
-                    <input
-                      type="checkbox"
-                      checked={vehicle.emergency}
-                      onChange={(e) => updateVehicle(vi, "emergency", e.target.checked)}
-                    />
-                    ⚠ 事故・緊急修理フラグ
-                  </label>
+
+                  {/* E) 作業時間 */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">作業時間</Label>
+                    {!vehicle.workStart && !vehicle.workEnd ? (
+                      <Button
+                        type="button"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => updateVehicle(vi, "workStart", nowTime())}
+                      >
+                        <Play className="w-4 h-4 mr-2" />
+                        作業開始
+                      </Button>
+                    ) : vehicle.workStart && !vehicle.workEnd ? (
+                      <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 font-medium">
+                        開始済み {vehicle.workStart}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                          {vehicle.workStart} 〜 {vehicle.workEnd}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground underline"
+                          onClick={() => {
+                            updateVehicle(vi, "workStart", "");
+                            updateVehicle(vi, "workEnd", "");
+                          }}
+                        >
+                          リセット
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* F) 入庫目的 */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground font-medium">入庫目的 *</p>
+                    {MAINTENANCE_PURPOSE_GROUPS.map((group) => {
+                      const hasLinked = group.label === "定期メンテナンス" || group.label === "修理・緊急対応";
+                      return (
+                        <div key={group.label} className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-slate-600">{group.label}</span>
+                            {hasLinked && (
+                              <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">
+                                明細連動
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {[...group.items].map((purpose) => (
+                              <button
+                                key={purpose}
+                                type="button"
+                                onClick={() => selectPurposeWithDefaults(vi, purpose)}
+                                className={`h-9 rounded-lg border text-sm transition-colors ${
+                                  vehicle.purpose === purpose
+                                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                                    : "border-input hover:bg-muted/40"
+                                }`}
+                              >
+                                {purpose}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {vehicle.purpose === "その他" && (
+                      <Input
+                        placeholder="入庫目的を入力"
+                        value={vehicle.purposeOther}
+                        onChange={(e) => updateVehicle(vi, "purposeOther", e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    )}
+                  </div>
+
+                  {/* G) 整備明細 */}
                   <div className="space-y-2.5 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-medium">🔧 整備明細</span>
-                      <span>{vehicle.details.length}件</span>
-                    </div>
-                    {vehicle.details.map((detail, di) => (
-                      <div key={di} className="rounded-md border border-amber-200/80 bg-white p-3 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                        <div className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-100/60 px-2.5 py-1.5">
-                          <p className="text-xs font-semibold text-amber-800">整備明細 {di + 1}</p>
-                        </div>
-                        <label className="flex items-center gap-2 text-sm border border-emerald-100 bg-emerald-50/50 text-emerald-700 rounded-md px-2.5 py-2">
-                          <input
-                            type="checkbox"
-                            checked={detail.noIssue}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              updateVehicleDetail(vi, di, "noIssue", checked);
-                              updateVehicleDetail(vi, di, "condition", checked ? "normal" : "other");
-                              updateVehicleDetail(vi, di, "action", checked ? "inspection_only" : "repair");
-                            }}
-                          />
-                          すべて異常なし（点検のみ）
-                        </label>
-                        <p className="text-xs font-medium text-muted-foreground">整備部位カテゴリ *</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {MAINTENANCE_CATEGORIES.map((category) => (
-                            <button
-                              key={category}
-                              type="button"
-                              onClick={() => {
-                                updateVehicleDetail(vi, di, "category", category);
-                                updateVehicleDetail(vi, di, "inspectionItems", []);
-                              }}
-                              className={`h-10 rounded-lg border text-sm transition-colors ${
-                                detail.category === category
-                                  ? "border-amber-400 bg-amber-200 text-amber-950"
-                                  : "border-amber-200 bg-amber-50/60 text-amber-900 hover:bg-amber-100"
-                              }`}
-                            >
-                              {category}
-                            </button>
-                          ))}
-                        </div>
-                        {detail.category && (
+                    <p className="text-xs font-medium text-muted-foreground">🔧 整備明細 {vehicle.details.length}件</p>
+
+                    {vehicle.details.map((detail, di) => {
+                      const allItems = MAINTENANCE_CATEGORY_ITEMS[detail.category] ?? [];
+
+                      return (
+                        <div
+                          key={di}
+                          className="rounded-md border border-amber-200/80 bg-white p-3 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+                        >
+                          {/* 明細ヘッダー */}
+                          <div className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-100/60 px-2.5 py-1.5">
+                            <p className="text-xs font-semibold text-amber-800">整備明細 {di + 1}</p>
+                            {vehicle.details.length > 1 && (
+                              <button
+                                type="button"
+                                className="text-xs text-destructive underline"
+                                onClick={() => removeVehicleDetail(vi, di)}
+                              >
+                                削除
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 問題なし / 要注意 */}
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <label className="flex items-center gap-1.5 text-sm border border-emerald-100 bg-emerald-50/50 text-emerald-700 rounded-md px-2.5 py-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={detail.noIssue}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  updateVehicleDetail(vi, di, "noIssue", checked);
+                                  updateVehicleDetail(vi, di, "condition", checked ? "normal" : "other");
+                                  updateVehicleDetail(vi, di, "action", checked ? "inspection_only" : "repair");
+                                }}
+                              />
+                              問題なし
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm border border-orange-100 bg-orange-50/50 text-orange-700 rounded-md px-2.5 py-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={detail.requiresAttention}
+                                onChange={(e) => updateVehicleDetail(vi, di, "requiresAttention", e.target.checked)}
+                              />
+                              ⚠ 要運行管理連絡
+                            </label>
+                          </div>
+
+                          {/* カテゴリ */}
                           <div className="space-y-1.5">
-                            <p className="text-xs font-medium text-muted-foreground">点検項目</p>
-                            <div className="grid grid-cols-2 gap-2">
-                              {(MAINTENANCE_CATEGORY_ITEMS[detail.category] ?? []).map((item) => {
-                                const selected = (detail.inspectionItems ?? []).includes(item);
-                                return (
-                                  <button
-                                    key={item}
-                                    type="button"
-                                    onClick={() => {
-                                      const current = detail.inspectionItems ?? [];
-                                      const next = selected
-                                        ? current.filter((v) => v !== item)
-                                        : [...current, item];
-                                      updateVehicleDetail(vi, di, "inspectionItems", next);
-                                    }}
-                                    className={`h-9 rounded-md border text-xs ${
-                                      selected
-                                        ? "border-sky-300 bg-sky-100 text-sky-900"
-                                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                    }`}
-                                  >
-                                    {item}
-                                  </button>
-                                );
-                              })}
+                            <p className="text-xs font-medium text-muted-foreground">整備部位カテゴリ *</p>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {MAINTENANCE_CATEGORIES.map((cat) => (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => {
+                                    updateVehicleDetail(vi, di, "category", cat);
+                                    updateVehicleDetail(vi, di, "inspectionItems", []);
+                                  }}
+                                  className={`h-9 rounded-lg border text-xs transition-colors ${
+                                    detail.category === cat
+                                      ? "border-blue-300 bg-blue-50 text-blue-700 font-medium"
+                                      : "border-input hover:bg-muted/40"
+                                  }`}
+                                >
+                                  {cat}
+                                </button>
+                              ))}
                             </div>
+                            {detail.category === "その他" && (
+                              <Input
+                                placeholder="カテゴリを入力"
+                                value={detail.categoryOther}
+                                onChange={(e) => updateVehicleDetail(vi, di, "categoryOther", e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            )}
                           </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">状態 *</p>
-                            <select
-                              value={detail.condition}
-                              onChange={(e) =>
-                                updateVehicleDetail(
-                                  vi,
-                                  di,
-                                  "condition",
-                                  e.target.value as "normal" | "worn" | "damaged" | "cracked" | "leaking" | "bulb_out" | "other"
-                                )
-                              }
-                              className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
-                            >
-                              {MAINTENANCE_CONDITIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">処置 *</p>
-                            <select
-                              value={detail.action}
-                              onChange={(e) =>
-                                updateVehicleDetail(
-                                  vi,
-                                  di,
-                                  "action",
-                                  e.target.value as
-                                    | "inspection_only"
-                                    | "cleaning"
-                                    | "adjustment"
-                                    | "lubrication"
-                                    | "parts_replacement"
-                                    | "repair"
-                                    | "observation"
-                                    | "other"
-                                )
-                              }
-                              className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
-                            >
-                              {MAINTENANCE_ACTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/70 p-2.5">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-medium text-muted-foreground">使用部品</p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => addDetailPart(vi, di)}
-                            >
-                              + 部品追加
-                            </Button>
-                          </div>
-                          {(detail.parts ?? []).length === 0 ? (
-                            <p className="text-xs text-muted-foreground">部品がある場合のみ追加してください</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {(detail.parts ?? []).map((part, partIndex) => (
-                                <div key={partIndex} className="rounded-md border border-slate-200 bg-white p-2 space-y-2">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <select
-                                      value={part.masterCategory}
-                                      onChange={(e) =>
-                                        updateDetailPart(
-                                          vi,
-                                          di,
-                                          partIndex,
-                                          "masterCategory",
-                                          e.target.value as "oil_fluid" | "consumable" | "misc" | "repair_work" | "exterior"
-                                        )
-                                      }
-                                      className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+
+                          {/* 点検項目 */}
+                          {detail.category && (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">点検項目</p>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {allItems.map((item) => {
+                                  const selected = (detail.inspectionItems ?? []).includes(item);
+                                  return (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      onClick={() => {
+                                        const current = detail.inspectionItems ?? [];
+                                        const next = selected
+                                          ? current.filter((v) => v !== item)
+                                          : [...current, item];
+                                        syncSuggestedPartsByInspectionItems(vi, di, next);
+                                      }}
+                                      className={`h-8 rounded-md border text-xs ${
+                                        selected
+                                          ? "border-sky-300 bg-sky-100 text-sky-900"
+                                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                      }`}
                                     >
-                                      {PART_MASTER_CATEGORY_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                          {opt.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <Input
-                                      placeholder="部品名"
-                                      value={part.partName}
-                                      onChange={(e) => updateDetailPart(vi, di, partIndex, "partName", e.target.value)}
-                                      className="h-9 text-xs"
-                                    />
+                                      {item}
+                                    </button>
+                                  );
+                                })}
+                                {/* その他ボタン */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = detail.inspectionItems ?? [];
+                                    const hasOther = current.includes("その他");
+                                    const next = hasOther
+                                      ? current.filter((v) => v !== "その他")
+                                      : [...current, "その他"];
+                                    syncSuggestedPartsByInspectionItems(vi, di, next);
+                                  }}
+                                  className={`h-8 rounded-md border text-xs ${
+                                    (detail.inspectionItems ?? []).includes("その他")
+                                      ? "border-sky-300 bg-sky-100 text-sky-900"
+                                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  その他
+                                </button>
+                              </div>
+                              {(detail.inspectionItems ?? []).includes("その他") && (
+                                <Input
+                                  placeholder="その他点検項目を入力"
+                                  value={detail.inspectionItemOther}
+                                  onChange={(e) => updateVehicleDetail(vi, di, "inspectionItemOther", e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              )}
+                            </div>
+                          )}
+
+                          {/* 整備内容（状態・処置 + 測定値 + 交換・補充内容インライン） */}
+                          {!detail.noIssue && detail.inspectionItems.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">整備内容</p>
+                              <div className="space-y-1.5">
+                                {detail.inspectionItems.map((item) => {
+                                  const measurement = INSPECTION_ITEM_MEASUREMENTS[item];
+                                  const linkedParts = (detail.parts ?? [])
+                                    .map((p, idx) => ({ ...p, idx }))
+                                    .filter((p) => p.linkedItem === item);
+                                  const isItemNoIssue = (detail.noIssueItems ?? []).includes(item);
+                                  const itemCondition =
+                                    (detail.itemDetails ?? {})[item]?.condition ?? detail.condition;
+                                  const itemAction =
+                                    (detail.itemDetails ?? {})[item]?.action ?? detail.action;
+                                  const isRotationItem = item === "タイヤローテーション";
+                                  const isRotationMode =
+                                    !isRotationItem &&
+                                    TIRE_PART_NAMES.some((n) =>
+                                      linkedParts.some((p) => p.partName === n)
+                                    ) && itemAction === "adjustment";
+                                  // フィルタ済みの選択肢リスト（状態・処置）を作成し、現在値が含まれない場合は先頭を使う
+                                  const condOpts = ITEM_CONDITION_MAP[item]
+                                    ? MAINTENANCE_CONDITIONS.filter((o) =>
+                                        ITEM_CONDITION_MAP[item].includes(o.value)
+                                      )
+                                    : MAINTENANCE_CONDITIONS;
+                                  const actOpts = ITEM_ACTION_MAP[item]
+                                    ? MAINTENANCE_ACTIONS.filter((o) =>
+                                        ITEM_ACTION_MAP[item].includes(o.value)
+                                      )
+                                    : MAINTENANCE_ACTIONS;
+                                  const effectiveCondition = condOpts.some((o) => o.value === itemCondition)
+                                    ? itemCondition
+                                    : (condOpts[0]?.value ?? itemCondition);
+                                  const effectiveAction = actOpts.some((o) => o.value === itemAction)
+                                    ? itemAction
+                                    : (actOpts[0]?.value ?? itemAction);
+                                  return (
+                                    <div
+                                      key={item}
+                                      className={`rounded-md border px-2.5 py-2 space-y-2 ${
+                                        isItemNoIssue
+                                          ? "border-slate-200 bg-slate-50 opacity-60"
+                                          : "border-amber-200 bg-amber-50/50"
+                                      }`}
+                                    >
+                                      <p
+                                        className={`text-xs font-semibold ${
+                                          isItemNoIssue ? "text-slate-400 line-through" : "text-amber-800"
+                                        }`}
+                                      >
+                                        {item}
+                                      </p>
+                                      <label className="flex items-center gap-1.5 text-xs cursor-pointer text-slate-500 select-none w-fit">
+                                        <input
+                                          type="checkbox"
+                                          checked={isItemNoIssue}
+                                          onChange={(e) => {
+                                            const next = e.target.checked
+                                              ? [...(detail.noIssueItems ?? []), item]
+                                              : (detail.noIssueItems ?? []).filter((i) => i !== item);
+                                            updateVehicleDetail(vi, di, "noIssueItems", next);
+                                          }}
+                                        />
+                                        異常なし
+                                      </label>
+                                      {!isItemNoIssue && (
+                                        <>
+                                          {measurement && (
+                                            <div className="flex items-center gap-2">
+                                              <Ruler className="w-3.5 h-3.5 text-slate-400" />
+                                              <span className="text-xs text-slate-600">{measurement.label}:</span>
+                                              <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                className="h-6 w-16 text-xs px-2"
+                                                value={detail.measurements[item] ?? ""}
+                                                onChange={(e) => {
+                                                  const newMeasurements = {
+                                                    ...detail.measurements,
+                                                    [item]: e.target.value,
+                                                  };
+                                                  updateVehicleDetail(vi, di, "measurements", newMeasurements);
+                                                }}
+                                              />
+                                              <span className="text-xs text-slate-500">{measurement.unit}</span>
+                                            </div>
+                                          )}
+                                          {linkedParts.length > 0 && (
+                                            <div className="space-y-1.5">
+                                              <p className="text-xs text-slate-500 flex items-center gap-1">
+                                                <Wrench className="w-3 h-3" />
+                                                交換・補充内容
+                                              </p>
+                                              {linkedParts.map((part) => {
+                                                const hasTirePos = TIRE_PART_NAMES.includes(part.partName);
+                                                const [fromPos, toPos] = part.position.includes("→")
+                                                  ? part.position.split("→")
+                                                  : [part.position, ""];
+                                                return (
+                                                  <div key={part.idx} className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs text-slate-700 font-medium min-w-[80px]">
+                                                      {part.partName}
+                                                    </span>
+                                                    <Input
+                                                      type="number"
+                                                      min={0}
+                                                      step="0.1"
+                                                      placeholder="数量"
+                                                      value={part.quantity}
+                                                      onChange={(e) =>
+                                                        updateDetailPart(vi, di, part.idx, "quantity", e.target.value)
+                                                      }
+                                                      className="h-7 w-16 text-xs px-2"
+                                                    />
+                                                    <span className="text-xs text-slate-500">{part.unit}</span>
+                                                    {hasTirePos && isRotationMode ? (
+                                                      <div className="flex items-center gap-1">
+                                                        <select
+                                                          value={fromPos}
+                                                          onChange={(e) =>
+                                                            updateDetailPart(
+                                                              vi,
+                                                              di,
+                                                              part.idx,
+                                                              "position",
+                                                              `${e.target.value}→${toPos}`
+                                                            )
+                                                          }
+                                                          className="h-7 rounded border border-input bg-background px-1 text-xs"
+                                                        >
+                                                          <option value="">元位置</option>
+                                                          {TIRE_POSITIONS.map((pos) => (
+                                                            <option key={pos} value={pos}>
+                                                              {pos}
+                                                            </option>
+                                                          ))}
+                                                        </select>
+                                                        <span className="text-xs text-slate-400">→</span>
+                                                        <select
+                                                          value={toPos}
+                                                          onChange={(e) =>
+                                                            updateDetailPart(
+                                                              vi,
+                                                              di,
+                                                              part.idx,
+                                                              "position",
+                                                              `${fromPos}→${e.target.value}`
+                                                            )
+                                                          }
+                                                          className="h-7 rounded border border-input bg-background px-1 text-xs"
+                                                        >
+                                                          <option value="">移動先</option>
+                                                          {TIRE_POSITIONS.map((pos) => (
+                                                            <option key={pos} value={pos}>
+                                                              {pos}
+                                                            </option>
+                                                          ))}
+                                                        </select>
+                                                      </div>
+                                                    ) : hasTirePos ? (
+                                                      <select
+                                                        value={part.position}
+                                                        onChange={(e) =>
+                                                          updateDetailPart(
+                                                            vi,
+                                                            di,
+                                                            part.idx,
+                                                            "position",
+                                                            e.target.value
+                                                          )
+                                                        }
+                                                        className="h-7 rounded border border-input bg-background px-1 text-xs"
+                                                      >
+                                                        <option value="">取付位置</option>
+                                                        {TIRE_POSITIONS.map((pos) => (
+                                                          <option key={pos} value={pos}>
+                                                            {pos}
+                                                          </option>
+                                                        ))}
+                                                      </select>
+                                                    ) : (
+                                                      <Input
+                                                        placeholder="取付位置"
+                                                        value={part.position}
+                                                        onChange={(e) =>
+                                                          updateDetailPart(
+                                                            vi,
+                                                            di,
+                                                            part.idx,
+                                                            "position",
+                                                            e.target.value
+                                                          )
+                                                        }
+                                                        className="h-7 w-20 text-xs px-2"
+                                                      />
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                          {/* タイヤローテーション専用：位置マップ */}
+                                          {isRotationItem && (
+                                            <div className="space-y-1.5 pt-1">
+                                              <p className="text-xs text-slate-500 flex items-center gap-1">
+                                                <RotateCcw className="w-3 h-3" />
+                                                回転先（どこのタイヤをどこへ）
+                                              </p>
+                                              {["FL", "FR", "RL", "RR"].map((fromPos) => {
+                                                const key = `${item}_${fromPos}`;
+                                                return (
+                                                  <div key={fromPos} className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium w-8 text-slate-600">{fromPos}</span>
+                                                    <span className="text-xs text-slate-400">→</span>
+                                                    <select
+                                                      value={detail.measurements[key] ?? ""}
+                                                      onChange={(e) =>
+                                                        updateVehicleDetail(vi, di, "measurements", {
+                                                          ...detail.measurements,
+                                                          [key]: e.target.value,
+                                                        })
+                                                      }
+                                                      className="h-7 rounded border border-input bg-background px-1 text-xs flex-1"
+                                                    >
+                                                      <option value="">移動先を選択</option>
+                                                      {TIRE_POSITIONS.filter((p) => p !== fromPos && p !== "全輪").map((pos) => (
+                                                        <option key={pos} value={pos}>{pos}</option>
+                                                      ))}
+                                                    </select>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                          {/* 状態・処置（各項目ごと） */}
+                                          <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <div>
+                                              <p className="text-xs text-muted-foreground mb-1">状態</p>
+                                              <select
+                                                value={effectiveCondition}
+                                                onChange={(e) =>
+                                                  updateVehicleDetail(vi, di, "itemDetails", {
+                                                    ...(detail.itemDetails ?? {}),
+                                                    [item]: {
+                                                      condition: e.target.value as MaintenanceDetailForm["condition"],
+                                                      action: effectiveAction as MaintenanceDetailForm["action"],
+                                                    },
+                                                  })
+                                                }
+                                                className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                                              >
+                                                {condOpts.map((opt) => (
+                                                  <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-muted-foreground mb-1">処置</p>
+                                              <select
+                                                value={effectiveAction}
+                                                onChange={(e) =>
+                                                  updateVehicleDetail(vi, di, "itemDetails", {
+                                                    ...(detail.itemDetails ?? {}),
+                                                    [item]: {
+                                                      condition: effectiveCondition as MaintenanceDetailForm["condition"],
+                                                      action: e.target.value as MaintenanceDetailForm["action"],
+                                                    },
+                                                  })
+                                                }
+                                                className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                                              >
+                                                {actOpts.map((opt) => (
+                                                  <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 追加部品（任意） */}
+                          <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/70 p-2.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-medium text-muted-foreground">追加部品（任意）</p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => addDetailPart(vi, di)}
+                              >
+                                + 部品追加
+                              </Button>
+                            </div>
+                            {(detail.parts ?? []).filter((p) => !p.linkedItem).length === 0 ? (
+                              <p className="text-xs text-muted-foreground">点検項目に紐づかない部品を手動追加できます</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {(detail.parts ?? []).map((part, partIndex) => {
+                                  if (part.linkedItem) return null;
+                                  return (
+                                  <div key={partIndex} className="rounded-md border border-slate-200 bg-white p-2 space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <select
+                                        value={part.masterCategory}
+                                        onChange={(e) =>
+                                          updateDetailPart(
+                                            vi,
+                                            di,
+                                            partIndex,
+                                            "masterCategory",
+                                            e.target.value as MaintenanceDetailForm["parts"][number]["masterCategory"]
+                                          )
+                                        }
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                                      >
+                                        {PART_MASTER_CATEGORY_OPTIONS.map((opt) => (
+                                          <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <Input
+                                        placeholder="部品名"
+                                        value={part.partName}
+                                        onChange={(e) => updateDetailPart(vi, di, partIndex, "partName", e.target.value)}
+                                        className="h-9 text-xs"
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        placeholder="数量"
+                                        value={part.quantity}
+                                        onChange={(e) => updateDetailPart(vi, di, partIndex, "quantity", e.target.value)}
+                                        className="h-9 text-xs"
+                                      />
+                                      <Input
+                                        placeholder="単位"
+                                        value={part.unit}
+                                        onChange={(e) => updateDetailPart(vi, di, partIndex, "unit", e.target.value)}
+                                        className="h-9 text-xs"
+                                      />
+                                      <Input
+                                        placeholder="取付位置"
+                                        value={part.position}
+                                        onChange={(e) => updateDetailPart(vi, di, partIndex, "position", e.target.value)}
+                                        className="h-9 text-xs"
+                                      />
+                                    </div>
+                                    <div className="flex justify-end">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-xs text-destructive"
+                                        onClick={() => removeDetailPart(vi, di, partIndex)}
+                                      >
+                                        削除
+                                      </Button>
+                                    </div>
                                   </div>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      placeholder="数量"
-                                      value={part.quantity}
-                                      onChange={(e) => updateDetailPart(vi, di, partIndex, "quantity", e.target.value)}
-                                      className="h-9 text-xs"
-                                    />
-                                    <Input
-                                      placeholder="単位"
-                                      value={part.unit}
-                                      onChange={(e) => updateDetailPart(vi, di, partIndex, "unit", e.target.value)}
-                                      className="h-9 text-xs"
-                                    />
-                                    <Input
-                                      placeholder="取付位置"
-                                      value={part.position}
-                                      onChange={(e) => updateDetailPart(vi, di, partIndex, "position", e.target.value)}
-                                      className="h-9 text-xs"
-                                    />
-                                  </div>
-                                  <div className="flex justify-end">
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 写真 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">📷 写真添付</p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="gap-1 border-slate-300 h-8"
+                                onClick={() => {
+                                  const input = document.getElementById(`detail-photo-${vi}-${di}`) as HTMLInputElement | null;
+                                  input?.click();
+                                }}
+                              >
+                                <Camera className="w-4 h-4" />
+                                撮影・選択
+                              </Button>
+                            </div>
+                            <input
+                              id={`detail-photo-${vi}-${di}`}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                handleSelectDetailPhoto(vi, di, e.target.files);
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                            {(detail.photos ?? []).length > 0 && (
+                              <div className="space-y-1">
+                                {(detail.photos ?? []).map((photo, photoIndex) => (
+                                  <div
+                                    key={`${photo.fileName}-${photoIndex}`}
+                                    className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-2 py-1"
+                                  >
+                                    <p className="text-xs text-slate-700 truncate pr-2">{photo.fileName}</p>
                                     <Button
                                       type="button"
                                       size="sm"
                                       variant="ghost"
-                                      className="h-7 px-2 text-xs text-destructive"
-                                      onClick={() => removeDetailPart(vi, di, partIndex)}
+                                      className="h-6 px-2 text-xs text-destructive"
+                                      onClick={() => removeDetailPhoto(vi, di, photoIndex)}
                                     >
                                       削除
                                     </Button>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium text-muted-foreground">📷 写真添付</p>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 border-slate-300 h-8"
-                            onClick={() => {
-                              const input = document.getElementById(`detail-photo-${vi}-${di}`) as HTMLInputElement | null;
-                              input?.click();
-                            }}
-                          >
-                            <Camera className="w-4 h-4" />
-                            撮影・選択
-                          </Button>
-                        </div>
-                        <input
-                          id={`detail-photo-${vi}-${di}`}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            handleSelectDetailPhoto(vi, di, e.target.files);
-                            e.currentTarget.value = "";
-                          }}
-                        />
-                        {(detail.photos ?? []).length > 0 && (
-                          <div className="space-y-1">
-                            {(detail.photos ?? []).map((photo, photoIndex) => (
-                              <div
-                                key={`${photo.fileName}-${photoIndex}`}
-                                className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-2 py-1"
-                              >
-                                <p className="text-xs text-slate-700 truncate pr-2">{photo.fileName}</p>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 px-2 text-xs text-destructive"
-                                  onClick={() => removeDetailPhoto(vi, di, photoIndex)}
-                                >
-                                  削除
-                                </Button>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        )}
-                        <textarea
-                          rows={2}
-                          placeholder="特記事項（任意）"
-                          value={detail.note}
-                          onChange={(e) => updateVehicleDetail(vi, di, "note", e.target.value)}
-                          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                        />
-                      </div>
-                    ))}
+
+                          {/* 特記事項 */}
+                          <textarea
+                            rows={2}
+                            placeholder="特記事項（任意）"
+                            value={detail.note}
+                            onChange={(e) => updateVehicleDetail(vi, di, "note", e.target.value)}
+                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                          />
+                        </div>
+                      );
+                    })}
+
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => addVehicleDetail(vi)}
                       className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-100/40"
                     >
-                      + 整備明細を追加
+                      ＋ 整備明細を追加
                     </Button>
                   </div>
+
+                  {/* I) 完了後確認チェック */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">完了後確認チェック</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          { key: "engineStart", label: "エンジン始動確認" },
+                          { key: "testDrive", label: "試走確認" },
+                          { key: "noLeaks", label: "漏れなし確認" },
+                          { key: "lights", label: "灯火確認" },
+                        ] as { key: keyof MaintenanceVehicleForm["completionChecks"]; label: string }[]
+                      ).map(({ key, label }) => (
+                        <label
+                          key={key}
+                          className={`flex items-center gap-2 text-xs rounded-md border px-2.5 py-2 cursor-pointer transition-colors ${
+                            vehicle.completionChecks[key]
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-600"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={vehicle.completionChecks[key]}
+                            onChange={(e) =>
+                              updateVehicle(vi, "completionChecks", {
+                                ...vehicle.completionChecks,
+                                [key]: e.target.checked,
+                              })
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* J) 外注依頼（外装部品がある場合のみ表示） */}
+                  {vehicle.details.some((d) =>
+                    (d.parts ?? []).some((p) => p.masterCategory === "exterior")
+                  ) && (
+                    <div className="rounded-lg border border-violet-200 bg-violet-50/40 px-3 py-2.5 space-y-2">
+                      <p className="text-xs font-medium text-violet-800">外注依頼</p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="外注先（例: ○○タイヤ、△△板金）"
+                          value={vehicle.outsourceVendor}
+                          onChange={(e) => updateVehicle(vi, "outsourceVendor", e.target.value)}
+                          className="h-8 text-xs flex-1"
+                        />
+                        <select
+                          value={vehicle.outsourceStatus}
+                          onChange={(e) =>
+                            updateVehicle(vi, "outsourceStatus", e.target.value as MaintenanceVehicleForm["outsourceStatus"])
+                          }
+                          className="flex h-8 w-24 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="">状態</option>
+                          <option value="pending">依頼中</option>
+                          <option value="completed">完了</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* K) 車両総合判定 */}
+                  <div className="rounded-md border border-slate-200 bg-slate-50/50 p-2.5 space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">車両総合判定</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {OVERALL_JUDGMENT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() =>
+                            updateVehicle(
+                              vi,
+                              "overallJudgment",
+                              vehicle.overallJudgment === opt.value ? "" : opt.value
+                            )
+                          }
+                          className={`h-9 rounded-lg border text-xs font-medium transition-colors ${
+                            vehicle.overallJudgment === opt.value ? opt.activeClass : opt.inactiveClass
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 作業終了ボタン・合計作業時間 */}
+                  {vehicle.workStart && !vehicle.workEnd && (
+                    <Button
+                      type="button"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                      onClick={() => updateVehicle(vi, "workEnd", nowTime())}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      作業終了
+                    </Button>
+                  )}
+                  {vehicle.workStart && vehicle.workEnd && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 font-semibold flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        合計作業時間: {calcWorkDuration(vehicle.workStart, vehicle.workEnd)}
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-emerald-600 underline font-normal"
+                        onClick={() => {
+                          updateVehicle(vi, "workStart", "");
+                          updateVehicle(vi, "workEnd", "");
+                        }}
+                      >
+                        リセット
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
+
+              <div className="pt-2 text-center text-sm text-slate-500">
+                この車両は完了しました。次へ行く場合は
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addVehicle}
+                  className="ml-2 border-dashed border-slate-400 text-slate-600 hover:bg-slate-50 gap-1 inline-flex"
+                >
+                  <Plus className="w-4 h-4" />
+                  車両を追加
+                </Button>
+              </div>
             </CardContent>
           </Card>
+
+          {/* 全車両 作業時間サマリー */}
+          {maintenanceVehicles.some((v) => v.workStart || v.workEnd) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">作業時間サマリー</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {maintenanceVehicles.map((v, vi) => {
+                  if (!v.workStart && !v.workEnd) return null;
+                  return (
+                    <div
+                      key={vi}
+                      className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                    >
+                      <span className="text-slate-700 font-medium">
+                        {v.vehicleNumberPrefix ? `${v.vehicleNumberPrefix} ` : ""}
+                        {v.vehicleName || `車両${vi + 1}`}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-600">
+                          {v.workStart || "--:--"} 〜 {v.workEnd || "--:--"}
+                        </span>
+                        {v.workStart && v.workEnd && (
+                          <span className="text-emerald-600 font-semibold">
+                            {calcWorkDuration(v.workStart, v.workEnd)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* 全車両の合計時間 */}
+                {(() => {
+                  const completedVehicles = maintenanceVehicles.filter((v) => v.workStart && v.workEnd);
+                  if (completedVehicles.length < 2) return null;
+                  const totalMin = completedVehicles.reduce((sum, v) => {
+                    const [sh, sm] = v.workStart.split(":").map(Number);
+                    const [eh, em] = v.workEnd.split(":").map(Number);
+                    return sum + Math.max(0, eh * 60 + em - (sh * 60 + sm));
+                  }, 0);
+                  if (totalMin <= 0) return null;
+                  const h = Math.floor(totalMin / 60);
+                  const m = totalMin % 60;
+                  const label = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
+                  return (
+                    <div className="flex items-center justify-between rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm mt-1">
+                      <span className="text-emerald-800 font-semibold">全車両 合計作業時間</span>
+                      <span className="text-emerald-700 font-bold text-base">{label}</span>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">
@@ -1396,6 +2425,7 @@ export default function ReportNew() {
               />
             </CardContent>
           </Card>
+
         </>
       ) : (
         <Card>
@@ -1456,24 +2486,26 @@ export default function ReportNew() {
         </Card>
       )}
 
-      {/* 送信ボタン */}
-      <div className="flex gap-3">
-        <Button
-          variant="outline"
-          className="flex-1"
-          onClick={() => handleSubmit("draft")}
-          disabled={createMutation.isPending}
-        >
-          下書き保存
-        </Button>
-        <Button
-          className="flex-1"
-          onClick={() => handleSubmit("submitted")}
-          disabled={createMutation.isPending}
-        >
-          提出
-        </Button>
-      </div>
+      {/* 非整備部門の送信ボタン */}
+      {!isMaintenance && (
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => handleSubmit("draft")}
+            disabled={createMutation.isPending}
+          >
+            下書き保存
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={() => handleSubmit("submitted")}
+            disabled={createMutation.isPending}
+          >
+            提出
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
