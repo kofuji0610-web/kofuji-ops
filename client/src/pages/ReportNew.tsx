@@ -2107,6 +2107,52 @@ export default function ReportNew() {
         </Card>
       )}
 
+      {/* スリッター 作業時間サマリー */}
+      {hasSlitter && slitterRecords.some((r) => r.startTime || r.endTime) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2"><Timer className="w-4 h-4" />作業時間サマリー</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {slitterRecords.map((r, i) => {
+              if (!r.startTime && !r.endTime) return null;
+              return (
+                <div key={i} className="flex items-center justify-between rounded-md border-2 border-stone-300 bg-white px-3 py-2 text-sm">
+                  <span className="text-slate-700 font-medium">
+                    {r.clientName ? r.clientName : `案件${i + 1}`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-600">
+                      {r.startTime || "--:--"} 〜 {r.endTime || "--:--"}
+                    </span>
+                    {r.processTime && (
+                      <span className="text-amber-700 font-semibold">{r.processTime}h</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {/* 全案件合計 */}
+            {(() => {
+              const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
+              if (done.length < 2) return null;
+              const totalH = done.reduce((sum, r) => sum + (parseFloat(r.processTime) || 0), 0);
+              if (totalH <= 0) return null;
+              const totalMin = Math.round(totalH * 60);
+              const h = Math.floor(totalMin / 60);
+              const m = totalMin % 60;
+              const label = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
+              return (
+                <div className="flex items-center justify-between rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-2 text-sm mt-1">
+                  <span className="text-amber-950 font-semibold">全案件 合計作業時間</span>
+                  <span className="text-amber-800 font-bold text-base">{label}</span>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {isMaintenance ? (
         <>
           {/* 車両別整備記録 */}
