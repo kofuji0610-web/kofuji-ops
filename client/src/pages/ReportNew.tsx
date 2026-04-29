@@ -666,7 +666,9 @@ function SlitterRecordBlock({
   return (
     <div className="border-2 border-sky-300 rounded-xl p-3.5 space-y-3 bg-white shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-sky-900">✂️ 案件 {VEHICLE_LABELS[index]}</p>
+        <p className="text-sm font-semibold text-sky-900">
+          ✂️ {record.clientName ? record.clientName : `案件 ${VEHICLE_LABELS[index]}`}
+        </p>
         {total > 1 && (
           <Button variant="ghost" size="icon" onClick={() => onRemove(index)}
             className="h-7 w-7 text-destructive">
