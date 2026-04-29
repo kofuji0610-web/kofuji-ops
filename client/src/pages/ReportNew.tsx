@@ -2089,12 +2089,8 @@ export default function ReportNew() {
       {/* スリッター案件別裁断記録 */}
       {hasSlitter && (
         <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">✂️ 案件別裁断記録</CardTitle>
-            <Button variant="outline" size="sm" onClick={addSlitterRecord}
-              className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
-              <Plus className="w-3.5 h-3.5" />案件を追加
-            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {slitterRecords.map((record, i) => (
@@ -2102,11 +2098,9 @@ export default function ReportNew() {
                 key={i} record={record} index={i} total={slitterRecords.length}
                 onChange={updateSlitterRecord} onRemove={removeSlitterRecord} />
             ))}
-            {slitterRecords.length > 1 && (
-              <p className="text-xs text-muted-foreground text-center">
-                この案件は完了しました。次の案件は【＋案件を追加】から追加できます
-              </p>
-            )}
+            <Button variant="outline" size="sm" onClick={addSlitterRecord} className="w-full h-9 gap-1">
+              <Plus className="w-3.5 h-3.5" />案件を追加
+            </Button>
           </CardContent>
         </Card>
       )}
