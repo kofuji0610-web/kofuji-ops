@@ -101,6 +101,7 @@ export const reports = mysqlTable("reports", {
   vehicleDetails: text("vehicle_details"),
   droneDetails: text("drone_details"),
   slitterDetails: text("slitter_details"),
+  paintingDetails: text("painting_details"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });

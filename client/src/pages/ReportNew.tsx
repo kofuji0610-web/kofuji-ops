@@ -386,6 +386,8 @@ type SlitterRecord = {
   honsu: string; choTori: string; speed: string;
   totalM: string; processTime: string;
   startTime: string; endTime: string;
+  salesAmount: string;
+  caseStatus: "進行中" | "完了" | "";
   note: string;
 };
 
@@ -395,6 +397,7 @@ const defaultSlitter = (): SlitterRecord => ({
   procW: "", procL: "", procLen: "",
   honsu: "", choTori: "", speed: "", totalM: "", processTime: "",
   startTime: "", endTime: "",
+  salesAmount: "", caseStatus: "",
   note: "",
 });
 
@@ -417,7 +420,8 @@ type DroneRecord = {
 };
 
 const defaultDrone = (): DroneRecord => ({
-  trainingType: "", trainingName: "", salesAmount: "", result: "", note: "", attendees: [],
+  trainingType: "", trainingName: "", salesAmount: "", result: "", note: "",
+  attendees: [defaultAttendee()],
 });
 
 const TASK_TYPES_DRONE = [
@@ -428,7 +432,92 @@ const TASK_TYPES_DRONE = [
   { value: "other",            label: "その他" },
 ];
 
+const TRAINING_NAMES_MAP: Record<string, string[]> = {
+  "国家資格講習": [
+    "一等 学科講習",
+    "一等 実地講習",
+    "二等 学科講習",
+    "二等 実地講習",
+    "限定変更講習",
+  ],
+  "NTT講習": [
+    "安全教育講習",
+    "実務研修",
+    "技術研修",
+  ],
+  "機械整備": [
+    "機体点検",
+    "定期メンテナンス",
+    "修理対応",
+  ],
+  "打合せ": [
+    "事前打合せ",
+    "進捗確認",
+    "契約打合せ",
+  ],
+  "その他": [],
+};
+
+const DRONE_RESULTS = ["合格", "修了", "不合格", "継続中", "未受験", "その他"];
+
 const VEHICLE_LABELS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+
+// ─── 塗装型 ───────────────────────────────────────────────────────────────────
+type PaintingWorkEntry = {
+  workTypes: string[];
+  startTime: string;
+  endTime: string;
+  processTime: string;
+  note: string;
+};
+
+const defaultPaintingEntry = (): PaintingWorkEntry => ({
+  workTypes: [], startTime: "", endTime: "", processTime: "", note: "",
+});
+
+type PaintingRecord = {
+  salesType: "外販" | "自社便" | "";
+  clientName: string;
+  vehicleBase: string;
+  vehicleNumberPrefix: string;
+  vehicleName: string;
+  vehicleNumber: string;
+  vehicleModel: string;
+  vehicleSpec: string;
+  salesAmount: string;
+  outsourceName: string;
+  outsourceCost: string;
+  workEntries: PaintingWorkEntry[];
+};
+
+const defaultPainting = (): PaintingRecord => ({
+  salesType: "", clientName: "",
+  vehicleBase: "", vehicleNumberPrefix: "", vehicleName: "",
+  vehicleNumber: "", vehicleModel: "", vehicleSpec: "",
+  salesAmount: "", outsourceName: "", outsourceCost: "",
+  workEntries: [defaultPaintingEntry()],
+});
+
+const PAINTING_VEHICLE_MODELS = ["2t", "4t", "8t", "10t", "トレーラー", "その他"];
+const PAINTING_SPECS = ["2面", "3面", "キャビン", "フルパッケージ", "その他"];
+
+const PAINTING_WORK_TYPES = [
+  "準備/脱脂",
+  "準備/マスキング完了処理",
+  "プリンター準備",
+  "塗装",
+  "データ製作",
+  "清掃",
+  "打合せ",
+  "塗装線補修",
+  "その他",
+];
+const PAINTING_STATUSES = [
+  { label: "受付中", color: "bg-amber-500" },
+  { label: "作業中", color: "bg-sky-600" },
+  { label: "完了",   color: "bg-emerald-600" },
+  { label: "保留",   color: "bg-slate-400" },
+];
 
 interface MaintenanceDetailForm {
   category: string;
@@ -683,6 +772,15 @@ function SlitterRecordBlock({
           value={record.clientName}
           onChange={(v) => onChange(index, { ...record, clientName: v })}
           className="h-9 text-sm flex-1" />
+        <Label className="text-xs shrink-0 text-sky-700 font-semibold">売上</Label>
+        <Input type="text" inputMode="numeric" placeholder="0"
+          value={record.salesAmount ? Number(record.salesAmount.replace(/,/g, "")).toLocaleString() : ""}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/,/g, "");
+            if (/^\d*$/.test(raw)) onChange(index, { ...record, salesAmount: raw });
+          }}
+          className="h-9 text-sm w-28 font-mono shrink-0" />
+        <span className="text-xs text-muted-foreground shrink-0">円</span>
       </div>
 
       {/* サイズ */}
@@ -797,6 +895,24 @@ function SlitterRecordBlock({
         </div>
       </div>
 
+      {/* 案件状況 */}
+      <div className="flex items-center gap-2">
+        <Label className="text-xs shrink-0 text-muted-foreground">案件状況</Label>
+        <div className="flex gap-1.5">
+          {(["進行中", "完了"] as const).map((s) => (
+            <button key={s} type="button"
+              onClick={() => onChange(index, { ...record, caseStatus: record.caseStatus === s ? "" : s })}
+              className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                record.caseStatus === s
+                  ? s === "完了"
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-amber-500 text-white border-amber-500"
+                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+              }`}>{s}</button>
+          ))}
+        </div>
+      </div>
+
       {/* 備考 */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">備考（任意）</Label>
@@ -832,27 +948,124 @@ function DroneRecordBlock({
         )}
       </div>
 
+      {/* 受講者情報（トップ） */}
+      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2 bg-sky-50/30">
+        <p className="text-xs font-semibold text-sky-700">👥 受講者情報</p>
+        {(record.attendees ?? []).map((att, ai) => {
+          const isLast = ai === (record.attendees ?? []).length - 1;
+          return (
+            <div key={ai} className="border-2 border-sky-200 rounded-lg p-2.5 space-y-2 bg-white">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-sky-800">
+                  {att.name ? att.name : `受講者 ${ai + 1}`}
+                  {att.type && <span className="ml-1 text-sky-400 font-normal">({att.type})</span>}
+                </span>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"
+                  onClick={() => {
+                    const updated = (record.attendees ?? []).filter((_, i) => i !== ai);
+                    onChange(index, { ...record, attendees: updated });
+                  }}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+              <div className="flex gap-3">
+                {(["個人", "法人"] as const).map((t) => (
+                  <label key={t} className="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" name={`attendee-type-${index}-${ai}`} value={t}
+                      checked={att.type === t}
+                      onChange={() => {
+                        const updated = (record.attendees ?? []).map((a, i) =>
+                          i === ai ? { ...a, type: t, company: t === "個人" ? "" : a.company } : a
+                        );
+                        onChange(index, { ...record, attendees: updated });
+                      }}
+                      className="accent-sky-600" />
+                    <span className="text-sm">{t}</span>
+                  </label>
+                ))}
+              </div>
+              {att.type === "法人" && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs w-14 shrink-0 text-muted-foreground">会社名 *</Label>
+                  <MemoryInput memoryKey="drone_company" placeholder="会社名を入力"
+                    value={att.company}
+                    onChange={(v) => {
+                      const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, company: v } : a);
+                      onChange(index, { ...record, attendees: updated });
+                    }}
+                    className="h-9 text-sm flex-1" />
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Label className="text-xs w-14 shrink-0 text-muted-foreground">氏名 *</Label>
+                <MemoryInput memoryKey="drone_attendee_name" placeholder="氏名を入力"
+                  value={att.name}
+                  onChange={(v) => {
+                    const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, name: v } : a);
+                    onChange(index, { ...record, attendees: updated });
+                  }}
+                  className="h-9 text-sm flex-1" />
+                {isLast && (
+                  <Button type="button" variant="outline" size="sm"
+                    className="h-9 text-xs gap-1 border-sky-300 text-sky-600 hover:bg-sky-50 shrink-0"
+                    onClick={() => onChange(index, { ...record, attendees: [...(record.attendees ?? []), defaultAttendee()] })}>
+                    <Plus className="w-3 h-3" />受講者追加
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* 講習情報 */}
       <div className="border border-sky-100 rounded-lg p-2.5 space-y-2.5 bg-sky-50/30">
         <p className="text-xs font-semibold text-sky-700">📋 講習情報</p>
-        <div className="flex items-center gap-2">
-          <Label className="text-xs w-16 shrink-0 text-muted-foreground">種別 *</Label>
-          <select value={record.trainingType}
-            onChange={(e) => onChange(index, { ...record, trainingType: e.target.value })}
-            className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm">
-            <option value="">選択してください</option>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">種別 *</Label>
+          <div className="flex flex-wrap gap-1.5">
             {TASK_TYPES_DRONE.map((t) => (
-              <option key={t.value} value={t.label}>{t.label}</option>
+              <button key={t.value} type="button"
+                onClick={() => onChange(index, {
+                  ...record,
+                  trainingType: record.trainingType === t.label ? "" : t.label,
+                  trainingName: record.trainingType === t.label ? "" : record.trainingName,
+                })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  record.trainingType === t.label
+                    ? "bg-sky-600 text-white border-sky-600"
+                    : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                }`}>
+                {t.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-xs w-16 shrink-0 text-muted-foreground">講習名</Label>
-          <MemoryInput memoryKey="training_name"
-            placeholder="例：一等無人航空機操縦士 学科試験対策"
-            value={record.trainingName}
-            onChange={(v) => onChange(index, { ...record, trainingName: v })}
-            className="h-9 text-sm flex-1" />
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">講習名</Label>
+          {(TRAINING_NAMES_MAP[record.trainingType] ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(TRAINING_NAMES_MAP[record.trainingType] ?? []).map((name) => (
+                <button key={name} type="button"
+                  onClick={() => onChange(index, {
+                    ...record,
+                    trainingName: record.trainingName === name ? "" : name,
+                  })}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    record.trainingName === name
+                      ? "bg-sky-600 text-white border-sky-600"
+                      : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                  }`}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+          <Input
+            placeholder="上記にない場合はここに入力"
+            value={(TRAINING_NAMES_MAP[record.trainingType] ?? []).includes(record.trainingName) ? "" : record.trainingName}
+            onChange={(e) => onChange(index, { ...record, trainingName: e.target.value })}
+            className="h-8 text-sm" />
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs w-16 shrink-0 text-muted-foreground">売上</Label>
@@ -867,83 +1080,52 @@ function DroneRecordBlock({
             <span className="text-xs text-muted-foreground shrink-0">円</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-xs w-16 shrink-0 text-muted-foreground">結果</Label>
-          <MemoryInput memoryKey="training_result" placeholder="例：合格、修了証取得"
-            value={record.result}
-            onChange={(v) => onChange(index, { ...record, result: v })}
-            className="h-9 text-sm flex-1" />
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">結果</Label>
+          {(() => {
+            const presets = DRONE_RESULTS.filter((r) => r !== "その他");
+            const isPreset = presets.includes(record.result);
+            const isCustom = record.result !== "" && !DRONE_RESULTS.includes(record.result);
+            return (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {DRONE_RESULTS.map((r) => {
+                    const active = r === "その他"
+                      ? (!isPreset && record.result !== "")
+                      : record.result === r;
+                    return (
+                      <button key={r} type="button"
+                        onClick={() => onChange(index, {
+                          ...record,
+                          result: r === "その他"
+                            ? (active ? "" : "その他")
+                            : (record.result === r ? "" : r),
+                        })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          active
+                            ? r === "合格" || r === "修了"
+                              ? "bg-emerald-600 text-white border-emerald-600"
+                              : r === "不合格"
+                              ? "bg-red-500 text-white border-red-500"
+                              : "bg-sky-600 text-white border-sky-600"
+                            : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                        }`}>
+                        {r}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(record.result === "その他" || isCustom) && (
+                  <Input
+                    placeholder="具体的な結果を入力してください"
+                    value={isCustom ? record.result : ""}
+                    onChange={(e) => onChange(index, { ...record, result: e.target.value })}
+                    className="h-8 text-sm" />
+                )}
+              </>
+            );
+          })()}
         </div>
-      </div>
-
-      {/* 受講者情報 */}
-      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2 bg-sky-50/30">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-sky-700">👥 受講者情報</p>
-          <Button type="button" variant="outline" size="sm"
-            className="h-7 text-xs gap-1 border-sky-300 text-sky-600 hover:bg-sky-50"
-            onClick={() => onChange(index, { ...record, attendees: [...(record.attendees ?? []), defaultAttendee()] })}>
-            <Plus className="w-3 h-3" />受講者を追加
-          </Button>
-        </div>
-        {(record.attendees ?? []).length === 0 && (
-          <p className="text-xs text-muted-foreground text-center py-1">受講者を追加してください</p>
-        )}
-        {(record.attendees ?? []).map((att, ai) => (
-          <div key={ai} className="border-2 border-sky-200 rounded-lg p-2.5 space-y-2 bg-white">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-sky-800">
-                {att.name ? att.name : `受講者 ${ai + 1}`}
-                {att.type && <span className="ml-1 text-sky-400 font-normal">({att.type})</span>}
-              </span>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"
-                onClick={() => {
-                  const updated = (record.attendees ?? []).filter((_, i) => i !== ai);
-                  onChange(index, { ...record, attendees: updated });
-                }}>
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            </div>
-            <div className="flex gap-3">
-              {(["個人", "法人"] as const).map((t) => (
-                <label key={t} className="flex items-center gap-1 cursor-pointer">
-                  <input type="radio" name={`attendee-type-${index}-${ai}`} value={t}
-                    checked={att.type === t}
-                    onChange={() => {
-                      const updated = (record.attendees ?? []).map((a, i) =>
-                        i === ai ? { ...a, type: t, company: t === "個人" ? "" : a.company } : a
-                      );
-                      onChange(index, { ...record, attendees: updated });
-                    }}
-                    className="accent-sky-600" />
-                  <span className="text-sm">{t}</span>
-                </label>
-              ))}
-            </div>
-            {att.type === "法人" && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs w-14 shrink-0 text-muted-foreground">会社名 *</Label>
-                <MemoryInput memoryKey="drone_company" placeholder="会社名を入力"
-                  value={att.company}
-                  onChange={(v) => {
-                    const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, company: v } : a);
-                    onChange(index, { ...record, attendees: updated });
-                  }}
-                  className="h-9 text-sm flex-1" />
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Label className="text-xs w-14 shrink-0 text-muted-foreground">氏名 *</Label>
-              <MemoryInput memoryKey="drone_attendee_name" placeholder="氏名を入力"
-                value={att.name}
-                onChange={(v) => {
-                  const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, name: v } : a);
-                  onChange(index, { ...record, attendees: updated });
-                }}
-                className="h-9 text-sm flex-1" />
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* 備考 */}
@@ -955,6 +1137,345 @@ function DroneRecordBlock({
           rows={2}
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
       </div>
+    </div>
+  );
+}
+
+// ─── PaintingRecordBlock ──────────────────────────────────────────────────────
+function PaintingRecordBlock({
+  record, index, total, extraWorkTypes = [], onChange, onRemove,
+}: {
+  record: PaintingRecord; index: number; total: number;
+  extraWorkTypes?: string[];
+  onChange: (index: number, updated: PaintingRecord) => void;
+  onRemove: (index: number) => void;
+}) {
+  const calcProcessTime = (start: string, end: string) => {
+    if (!start || !end) return "";
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const diff = (eh * 60 + em) - (sh * 60 + sm);
+    if (diff <= 0) return "";
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return h > 0 ? `${h}時間${m > 0 ? m + "分" : ""}` : `${m}分`;
+  };
+
+  const updateEntry = (ei: number, updated: PaintingWorkEntry) => {
+    const entries = record.workEntries.map((e, i) => i === ei ? updated : e);
+    onChange(index, { ...record, workEntries: entries });
+  };
+
+  const addEntry = () => {
+    onChange(index, { ...record, workEntries: [...record.workEntries, defaultPaintingEntry()] });
+  };
+
+  const removeEntry = (ei: number) => {
+    onChange(index, { ...record, workEntries: record.workEntries.filter((_, i) => i !== ei) });
+  };
+
+  const headerLabel = record.salesType === "外販" && record.clientName
+    ? record.clientName
+    : record.salesType === "自社便" && (record.vehicleNumberPrefix || record.vehicleName)
+    ? `${record.vehicleNumberPrefix}${record.vehicleName}`.trim()
+    : record.salesType
+    ? `${record.salesType} ${VEHICLE_LABELS[index]}`
+    : `車両 ${VEHICLE_LABELS[index]}`;
+
+  return (
+    <div className="border-2 border-sky-300 rounded-xl p-3.5 space-y-3 bg-white shadow-sm">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-sky-900">
+          🎨 {headerLabel}
+          {record.vehicleNumber && (
+            <span className="ml-2 text-xs font-normal text-sky-500">{record.vehicleNumber}</span>
+          )}
+        </p>
+        {total > 1 && (
+          <button type="button" onClick={() => onRemove(index)}
+            className="h-7 w-7 flex items-center justify-center rounded text-destructive hover:bg-red-50">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* 顧客・車両情報 */}
+      <div className="border border-sky-100 rounded-lg p-2.5 space-y-2 bg-sky-50/30">
+        <p className="text-xs font-semibold text-sky-700">🚗 車両・顧客情報</p>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs w-16 shrink-0 text-muted-foreground">区分</Label>
+          <div className="flex gap-1.5">
+            {(["外販", "自社便"] as const).map((t) => (
+              <button key={t} type="button"
+                onClick={() => onChange(index, {
+                  ...record,
+                  salesType: record.salesType === t ? "" : t,
+                  clientName: t === "自社便" ? "" : record.clientName,
+                })}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                  record.salesType === t
+                    ? t === "外販"
+                      ? "bg-sky-600 text-white border-sky-600"
+                      : "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                }`}>{t}</button>
+            ))}
+          </div>
+        </div>
+        {record.salesType === "外販" && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs w-16 shrink-0 text-muted-foreground">顧客名</Label>
+            <MemoryInput memoryKey="painting_client" placeholder="顧客名・会社名"
+              value={record.clientName}
+              onChange={(v) => onChange(index, { ...record, clientName: v })}
+              className="h-9 text-sm flex-1" />
+          </div>
+        )}
+        {record.salesType === "自社便" && (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" />拠点</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {VEHICLE_BASE_OPTIONS.map((b) => (
+                  <button key={b} type="button"
+                    onClick={() => onChange(index, { ...record, vehicleBase: record.vehicleBase === b ? "" : b })}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      record.vehicleBase === b
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}>{b}</button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">車番</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex flex-wrap gap-1.5">
+                  {VEHICLE_NUMBER_PREFIX_OPTIONS.map((p) => (
+                    <button key={p} type="button"
+                      onClick={() => onChange(index, { ...record, vehicleNumberPrefix: record.vehicleNumberPrefix === p ? "" : p })}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        record.vehicleNumberPrefix === p
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                      }`}>{p}</button>
+                  ))}
+                </div>
+                <Input placeholder="ナンバー"
+                  value={record.vehicleName}
+                  onChange={(e) => onChange(index, { ...record, vehicleName: e.target.value.replace(/[^\x21-\x7E]/g, "") })}
+                  className="h-9 text-sm w-24" />
+              </div>
+            </div>
+          </>
+        )}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">車種</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {PAINTING_VEHICLE_MODELS.filter((m) => m !== "その他").map((m) => (
+              <button key={m} type="button"
+                onClick={() => onChange(index, { ...record, vehicleModel: record.vehicleModel === m ? "" : m })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  record.vehicleModel === m
+                    ? "bg-sky-600 text-white border-sky-600"
+                    : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                }`}>{m}</button>
+            ))}
+            <button type="button"
+              onClick={() => onChange(index, {
+                ...record,
+                vehicleModel: PAINTING_VEHICLE_MODELS.slice(0, -1).includes(record.vehicleModel)
+                  ? "その他" : record.vehicleModel === "その他" ? "" : "その他",
+              })}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                !PAINTING_VEHICLE_MODELS.slice(0, -1).includes(record.vehicleModel) && record.vehicleModel !== ""
+                  ? "bg-sky-600 text-white border-sky-600"
+                  : record.vehicleModel === "その他" ? "bg-sky-600 text-white border-sky-600"
+                  : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+              }`}>その他</button>
+          </div>
+          {(record.vehicleModel === "その他" || (!PAINTING_VEHICLE_MODELS.includes(record.vehicleModel) && record.vehicleModel !== "")) && (
+            <Input placeholder="車種を入力（例：大型バス）"
+              value={PAINTING_VEHICLE_MODELS.includes(record.vehicleModel) ? "" : record.vehicleModel}
+              onChange={(e) => onChange(index, { ...record, vehicleModel: e.target.value })}
+              className="h-8 text-sm" />
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">仕様</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {PAINTING_SPECS.map((s) => (
+              <button key={s} type="button"
+                onClick={() => onChange(index, { ...record, vehicleSpec: record.vehicleSpec === s ? "" : s })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  record.vehicleSpec === s
+                    ? "bg-sky-600 text-white border-sky-600"
+                    : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                }`}>{s}</button>
+            ))}
+          </div>
+        </div>
+        {/* 金額情報 */}
+        <div className="rounded-md border border-sky-100 bg-white p-2 space-y-2">
+          <p className="text-[10px] font-semibold text-sky-600 tracking-wide">💰 売上</p>
+          {/* 売上 ー 外注費 ＝ 純利益 */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex flex-col items-center gap-0.5">
+                <Label className="text-[10px] text-muted-foreground">売上</Label>
+                <div className="flex items-center gap-0.5">
+                  <Input type="text" inputMode="numeric" placeholder="0"
+                    value={record.salesAmount ? Number(record.salesAmount.replace(/,/g, "")).toLocaleString() : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/,/g, "");
+                      if (/^\d*$/.test(raw)) onChange(index, { ...record, salesAmount: raw });
+                    }}
+                    className="h-8 text-sm w-28 font-mono" />
+                  <span className="text-xs text-muted-foreground">円</span>
+                </div>
+              </div>
+              <span className="text-slate-400 font-bold text-lg mt-4">ー</span>
+              <div className="flex flex-col items-center gap-0.5">
+                <Label className="text-[10px] text-muted-foreground">外注費</Label>
+                <div className="flex items-center gap-0.5">
+                  <Input type="text" inputMode="numeric" placeholder="0"
+                    value={record.outsourceCost ? Number(record.outsourceCost.replace(/,/g, "")).toLocaleString() : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/,/g, "");
+                      if (/^\d*$/.test(raw)) onChange(index, { ...record, outsourceCost: raw });
+                    }}
+                    className="h-8 text-sm w-28 font-mono" />
+                  <span className="text-xs text-muted-foreground">円</span>
+                </div>
+              </div>
+              <span className="text-slate-400 font-bold text-lg mt-4">＝</span>
+              <div className="flex flex-col items-center gap-0.5">
+                <Label className="text-[10px] text-sky-700 font-semibold">純利益</Label>
+                <div className="flex items-center gap-0.5 h-8 px-2 rounded bg-sky-50 border border-sky-200 min-w-[7rem] justify-end">
+                  <span className="text-sm font-bold text-sky-800 font-mono">
+                    {(() => {
+                      const s = parseInt(record.salesAmount?.replace(/,/g, "") || "0") || 0;
+                      const c = parseInt(record.outsourceCost?.replace(/,/g, "") || "0") || 0;
+                      return (s - c).toLocaleString();
+                    })()}
+                  </span>
+                  <span className="text-xs text-sky-600 ml-0.5">円</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">外注先</Label>
+              <MemoryInput memoryKey="painting_outsource" placeholder="外注先の会社名を入力"
+                value={record.outsourceName}
+                onChange={(v) => onChange(index, { ...record, outsourceName: v })}
+                className="h-8 text-sm" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 作業エントリ一覧 */}
+      {record.workEntries.map((entry, ei) => (
+        <div key={ei} className="border border-sky-200 rounded-lg p-2.5 space-y-2.5 bg-sky-50/20">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-sky-700">
+              🔧 作業 {record.workEntries.length > 1 ? VEHICLE_LABELS[ei] : ""}
+            </p>
+            {record.workEntries.length > 1 && (
+              <button type="button" onClick={() => removeEntry(ei)}
+                className="h-6 w-6 flex items-center justify-center rounded text-destructive hover:bg-red-50">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* 作業種別 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">作業種別</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {[...PAINTING_WORK_TYPES, ...extraWorkTypes].map((wt) => (
+                <button key={wt} type="button"
+                  onClick={() => {
+                    const updated = entry.workTypes.includes(wt)
+                      ? entry.workTypes.filter((w) => w !== wt)
+                      : [...entry.workTypes, wt];
+                    updateEntry(ei, { ...entry, workTypes: updated });
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    entry.workTypes.includes(wt)
+                      ? "bg-sky-600 text-white border-sky-600"
+                      : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                  }`}>{wt}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 作業時間 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">作業時間</Label>
+            <div className="flex items-center gap-2">
+              <button type="button"
+                disabled={!!entry.startTime}
+                onClick={() => {
+                  const now = new Date();
+                  const t = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+                  updateEntry(ei, { ...entry, startTime: t, processTime: calcProcessTime(t, entry.endTime) });
+                }}
+                className={`flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition-colors ${
+                  entry.startTime
+                    ? "bg-amber-50 border-amber-200 text-amber-700"
+                    : "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+                }`}>
+                {entry.startTime ? `▶ ${entry.startTime} 開始済` : "▶ 作業開始"}
+              </button>
+              <button type="button"
+                disabled={!entry.startTime || !!entry.endTime}
+                onClick={() => {
+                  const now = new Date();
+                  const t = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+                  updateEntry(ei, { ...entry, endTime: t, processTime: calcProcessTime(entry.startTime, t) });
+                }}
+                className={`flex-1 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition-colors ${
+                  entry.endTime
+                    ? "bg-sky-50 border-sky-200 text-sky-700"
+                    : !entry.startTime
+                    ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-sky-600 text-white border-sky-600 hover:bg-sky-700"
+                }`}>
+                {entry.endTime ? `■ ${entry.endTime} 終了済` : "■ 作業終了"}
+              </button>
+            </div>
+            {entry.processTime && (
+              <p className="text-center text-xs text-sky-700 font-semibold bg-sky-50 rounded py-1">
+                作業時間：{entry.processTime}
+              </p>
+            )}
+            {(entry.startTime || entry.endTime) && (
+              <button type="button"
+                onClick={() => updateEntry(ei, { ...entry, startTime: "", endTime: "", processTime: "" })}
+                className="text-[10px] text-muted-foreground underline w-full text-center">
+                時間をリセット
+              </button>
+            )}
+          </div>
+
+          {/* 備考 */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">備考（任意）</Label>
+            <textarea placeholder="特記事項があれば記入"
+              value={entry.note}
+              onChange={(e) => updateEntry(ei, { ...entry, note: e.target.value })}
+              rows={2}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
+          </div>
+        </div>
+      ))}
+
+      <button type="button" onClick={addEntry}
+        className="w-full h-8 rounded-lg border border-dashed border-sky-300 text-sky-600 text-xs font-medium flex items-center justify-center gap-1 hover:bg-sky-50 transition-colors">
+        <Plus className="w-3.5 h-3.5" />作業種別の追加
+      </button>
     </div>
   );
 }
@@ -985,6 +1506,7 @@ export default function ReportNew() {
   const [breakIsActive, setBreakIsActive] = useState(false);
   const [slitterRecords, setSlitterRecords] = useState<SlitterRecord[]>([defaultSlitter()]);
   const [droneRecords, setDroneRecords] = useState<DroneRecord[]>([defaultDrone()]);
+  const [paintingRecords, setPaintingRecords] = useState<PaintingRecord[]>([defaultPainting()]);
   const draftStorageKey = user?.id ? `reportNewDraft:${user.id}` : null;
 
   const monthStart = useMemo(() => {
@@ -1006,6 +1528,7 @@ export default function ReportNew() {
 
   const hasDrone = workBlocks.some((b) => b.department === "drone");
   const hasSlitter = workBlocks.some((b) => b.department === "slitter");
+  const hasPainting = workBlocks.some((b) => b.department === "painting");
 
   const { data: monthlySummary } = trpc.reports.getMonthlySummary.useQuery(
     { workDate: formData.workDate },
@@ -1173,6 +1696,17 @@ export default function ReportNew() {
   const addDroneRecord = () => setDroneRecords((prev) => [...prev, defaultDrone()]);
   const removeDroneRecord = (index: number) =>
     setDroneRecords((prev) => prev.filter((_, i) => i !== index));
+
+  const updatePaintingRecord = (index: number, updated: PaintingRecord) =>
+    setPaintingRecords((prev) => prev.map((r, i) => (i === index ? updated : r)));
+  const addPaintingRecord = () => setPaintingRecords((prev) => [...prev, defaultPainting()]);
+  const removePaintingRecord = (index: number) =>
+    setPaintingRecords((prev) => prev.filter((_, i) => i !== index));
+
+  const [customPaintingWorkTypes, setCustomPaintingWorkTypes] = useState<string[]>([]);
+  const [addingWorkType, setAddingWorkType] = useState(false);
+  const [newWorkTypeInput, setNewWorkTypeInput] = useState("");
+
 
   const updateVehicleDetail = (
     vehicleIndex: number,
@@ -1763,6 +2297,8 @@ export default function ReportNew() {
             processTime: v.processTime ? parseFloat(v.processTime) : undefined,
             startTime: v.startTime || undefined,
             endTime: v.endTime || undefined,
+            salesAmount: parseInt(v.salesAmount?.replace(/,/g, "") || "0") || undefined,
+            caseStatus: v.caseStatus || undefined,
             note: v.note || undefined,
           }))
         : undefined,
@@ -1775,6 +2311,28 @@ export default function ReportNew() {
             result: v.result || undefined,
             note: v.note || undefined,
             attendees: v.attendees?.length > 0 ? v.attendees : undefined,
+          }))
+        : undefined,
+      paintingDetails: hasPainting
+        ? paintingRecords.filter((v) => v.salesType || v.clientName || v.vehicleNumber).map((v) => ({
+            salesType: v.salesType || undefined,
+            clientName: v.clientName || undefined,
+            vehicleBase: v.vehicleBase || undefined,
+            vehicleNumberPrefix: v.vehicleNumberPrefix || undefined,
+            vehicleName: v.vehicleName || undefined,
+            vehicleNumber: v.vehicleNumber || undefined,
+            vehicleModel: v.vehicleModel || undefined,
+            vehicleSpec: v.vehicleSpec || undefined,
+            salesAmount: parseInt(v.salesAmount?.replace(/,/g, "") || "0") || undefined,
+            outsourceName: v.outsourceName || undefined,
+            outsourceCost: parseInt(v.outsourceCost?.replace(/,/g, "") || "0") || undefined,
+            workEntries: v.workEntries.length > 0 ? v.workEntries.map((e) => ({
+              workTypes: e.workTypes.length > 0 ? e.workTypes : undefined,
+              startTime: e.startTime || undefined,
+              endTime: e.endTime || undefined,
+              processTime: e.processTime || undefined,
+              note: e.note || undefined,
+            })) : undefined,
           }))
         : undefined,
     });
@@ -1894,14 +2452,9 @@ export default function ReportNew() {
         <CardContent className="space-y-3">
           {/* 業務内容（部署選択） */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-muted-foreground" />業務内容</p>
-                <p className="text-xs text-muted-foreground mt-0.5">複数の時間帯・部署にまたがる業務を追加できます</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={addWorkBlock} className="gap-1 h-8 text-xs">
-                <Plus className="w-3.5 h-3.5" />業務を追加
-              </Button>
+            <div>
+              <p className="text-sm font-semibold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-muted-foreground" />業務内容</p>
+              <p className="text-xs text-muted-foreground mt-0.5">複数の時間帯・部署にまたがる業務を追加できます</p>
             </div>
             {workBlocks.map((block, i) => (
               <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
@@ -1941,17 +2494,6 @@ export default function ReportNew() {
                   <p className="text-xs text-amber-700 font-medium">
                     ※ 裁断内容は「案件別裁断記録」カードに入力してください
                   </p>
-                )}
-                {block.department !== "maintenance" && block.department !== "drone" && block.department !== "slitter" && (
-                  <div className="space-y-1">
-                    <textarea
-                      value={block.content}
-                      onChange={(e) => updateWorkBlock(i, "content", e.target.value)}
-                      placeholder="業務内容を入力してください"
-                      rows={2}
-                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                    />
-                  </div>
                 )}
               </div>
             ))}
@@ -2008,66 +2550,151 @@ export default function ReportNew() {
               </div>
             </div>
           )}
-          {hasSlitter && (
-            <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">実績サマリー（自動集計）</p>
-              {/* 本日 */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-700">{slitterRecords.length}</p>
-                  <p className="text-[10px] text-muted-foreground">案件数</p>
-                </div>
-                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-700">{slitterTotalM.toFixed(1)}</p>
-                  <p className="text-[10px] text-muted-foreground">裁断m</p>
-                </div>
-                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-700">
-                    {slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0).toFixed(1)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">加工時間(h)</p>
-                </div>
-              </div>
-              {/* 今月累計 */}
-              <p className="text-xs text-muted-foreground font-medium">今月累計（本日含む）</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-500">
-                    {(monthlySlitterSummary?.monthlyCaseCount ?? 0) + slitterRecords.length}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">案件数</p>
-                </div>
-                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-500">
-                    {((monthlySlitterSummary?.monthlyTotalM ?? 0) + slitterTotalM).toFixed(1)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">裁断m</p>
-                </div>
-                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
-                  <p className="text-xl font-bold text-sky-500">
-                    {((monthlySlitterSummary?.monthlyProcessTime ?? 0) +
-                      slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0)).toFixed(1)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">加工時間(h)</p>
+          {hasSlitter && (() => {
+            const todaySales = slitterRecords
+              .filter((r) => r.caseStatus === "完了")
+              .reduce((s, r) => s + (parseInt(r.salesAmount?.replace(/,/g, "") || "0") || 0), 0);
+            const completedToday = slitterRecords.filter((r) => r.caseStatus === "完了").length;
+            const inProgressToday = slitterRecords.filter((r) => r.caseStatus === "進行中").length;
+            return (
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <p className="text-xs text-muted-foreground font-medium">✂️ スリッター 実績サマリー</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <p className="text-xl font-bold text-sky-700">{slitterRecords.length}</p>
+                    <p className="text-[10px] text-muted-foreground">案件数</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <p className="text-xl font-bold text-sky-700">{slitterTotalM.toFixed(1)}</p>
+                    <p className="text-[10px] text-muted-foreground">裁断m</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-sm font-bold text-emerald-600">完了 {completedToday}</span>
+                      <span className="text-xs text-slate-400">|</span>
+                      <span className="text-sm font-bold text-amber-500">進行中 {inProgressToday}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">案件状況</p>
+                  </div>
+                  <div className="bg-sky-50 rounded-lg border border-sky-300 p-2 text-center">
+                    <p className="text-xl font-bold text-sky-800">{todaySales.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground font-semibold">売上（円）</p>
+                    <p className="text-[9px] text-sky-500">完了案件のみ</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          {formData.department !== "maintenance" && !isMaintenanceFlow && (
-            <div>
-              <Label htmlFor="sharedInfo">共有事項</Label>
-              <textarea
-                id="sharedInfo"
-                value={formData.sharedInfo}
-                onChange={(e) => setFormData((p) => ({ ...p, sharedInfo: e.target.value }))}
-                placeholder="全員に共有したい情報を入力"
-                rows={3}
-                className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-              />
-            </div>
-          )}
+            );
+          })()}
+          {hasPainting && (() => {
+            const totalSales = paintingRecords.reduce((s, r) => s + (parseInt(r.salesAmount?.replace(/,/g, "") || "0") || 0), 0);
+            const totalOutsource = paintingRecords.reduce((s, r) => s + (parseInt(r.outsourceCost?.replace(/,/g, "") || "0") || 0), 0);
+            const totalProfit = totalSales - totalOutsource;
+            return (
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <p className="text-xs text-muted-foreground font-medium">🎨 塗装 実績サマリー</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <p className="text-xl font-bold text-sky-700">{paintingRecords.length}</p>
+                    <p className="text-[10px] text-muted-foreground">台数</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <p className="text-xl font-bold text-sky-700">{totalSales.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">売上（円）</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                    <p className="text-xl font-bold text-red-500">{totalOutsource.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">外注費（円）</p>
+                  </div>
+                  <div className="bg-sky-50 rounded-lg border border-sky-300 p-2 text-center">
+                    <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      {totalProfit.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-semibold">純利益（円）</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
+
+      {/* 塗装 車両別作業記録 */}
+      {hasPainting && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">🎨 車両別塗装記録</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {paintingRecords.map((record, i) => (
+              <PaintingRecordBlock
+                key={i} record={record} index={i} total={paintingRecords.length}
+                extraWorkTypes={customPaintingWorkTypes}
+                onChange={updatePaintingRecord} onRemove={removePaintingRecord} />
+            ))}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={addPaintingRecord} className="h-9 gap-1 px-6">
+                <Plus className="w-3.5 h-3.5" />車両を追加
+              </Button>
+              <Button variant="outline" size="sm" onClick={addWorkBlock} className="h-9 gap-1 px-4 text-xs text-muted-foreground">
+                <Plus className="w-3.5 h-3.5" />業務を追加
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 塗装 作業時間サマリー */}
+      {hasPainting && paintingRecords.some((r) => r.workEntries.some((e) => e.startTime || e.endTime)) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2"><Timer className="w-4 h-4" />🎨 塗装 作業時間サマリー</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {paintingRecords.map((rec, ri) =>
+              rec.workEntries.map((entry, ei) => {
+                if (!entry.startTime && !entry.endTime) return null;
+                const label = rec.clientName
+                  ? `${rec.clientName}${rec.workEntries.length > 1 ? ` (${VEHICLE_LABELS[ei]})` : ""}`
+                  : `車両 ${VEHICLE_LABELS[ri]}${rec.workEntries.length > 1 ? ` 作業${VEHICLE_LABELS[ei]}` : ""}`;
+                return (
+                  <div key={`${ri}-${ei}`}
+                    className="flex items-center justify-between rounded-md border-2 border-stone-300 bg-white px-3 py-2 text-sm">
+                    <span className="text-slate-700 font-medium">{label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-600">
+                        {entry.startTime || "--:--"} 〜 {entry.endTime || "--:--"}
+                      </span>
+                      {entry.processTime && (
+                        <span className="text-sky-700 font-semibold">{entry.processTime}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {/* 全車両 合計 */}
+            {(() => {
+              const allEntries = paintingRecords.flatMap((r) => r.workEntries).filter((e) => e.startTime && e.endTime);
+              if (allEntries.length < 2) return null;
+              const totalMin = allEntries.reduce((sum, e) => {
+                const [sh, sm] = e.startTime.split(":").map(Number);
+                const [eh, em] = e.endTime.split(":").map(Number);
+                return sum + Math.max(0, eh * 60 + em - (sh * 60 + sm));
+              }, 0);
+              if (totalMin <= 0) return null;
+              const h = Math.floor(totalMin / 60);
+              const m = totalMin % 60;
+              const label = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
+              return (
+                <div className="flex items-center justify-between rounded-md border-2 border-sky-400 bg-sky-50 px-3 py-2 text-sm mt-1">
+                  <span className="text-sky-950 font-semibold">全 {allEntries.length} 件 合計作業時間</span>
+                  <span className="text-sky-800 font-bold text-base">{label}</span>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ドローン講習別記録 */}
       {hasDrone && (
@@ -3174,22 +3801,25 @@ export default function ReportNew() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><MessageSquare className="w-4 h-4" />共有事項</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                value={formData.sharedInfo}
-                onChange={(e) => setFormData((p) => ({ ...p, sharedInfo: e.target.value }))}
-                placeholder="チームへの共有事項を入力してください"
-                rows={3}
-                className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-              />
-            </CardContent>
-          </Card>
-
         </>
+      )}
+
+      {/* 共有事項 */}
+      {!isMaintenanceFlow && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2"><MessageSquare className="w-4 h-4" />共有事項</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={formData.sharedInfo}
+              onChange={(e) => setFormData((p) => ({ ...p, sharedInfo: e.target.value }))}
+              placeholder="チームへの共有事項を入力してください"
+              rows={3}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* 送信ボタン（整備・非整備共通） */}

@@ -106,7 +106,29 @@ export const reportsRouter = router({
           processTime: z.number().optional(),
           startTime: z.string().optional(),
           endTime: z.string().optional(),
+          salesAmount: z.number().optional(),
+          caseStatus: z.string().optional(),
           note: z.string().optional(),
+        })).optional(),
+        paintingDetails: z.array(z.object({
+          salesType: z.string().optional(),
+          clientName: z.string().optional(),
+          vehicleBase: z.string().optional(),
+          vehicleNumberPrefix: z.string().optional(),
+          vehicleName: z.string().optional(),
+          vehicleNumber: z.string().optional(),
+          vehicleModel: z.string().optional(),
+          vehicleSpec: z.string().optional(),
+          salesAmount: z.number().optional(),
+          outsourceName: z.string().optional(),
+          outsourceCost: z.number().optional(),
+          workEntries: z.array(z.object({
+            workTypes: z.array(z.string()).optional(),
+            startTime: z.string().optional(),
+            endTime: z.string().optional(),
+            processTime: z.string().optional(),
+            note: z.string().optional(),
+          })).optional(),
         })).optional(),
         tasks: z
           .array(
@@ -123,7 +145,7 @@ export const reportsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { tasks, droneDetails, slitterDetails, ...reportData } = input;
+      const { tasks, droneDetails, slitterDetails, paintingDetails, ...reportData } = input;
 
       const [result] = await db.insert(reports).values({
         ...reportData,
@@ -131,6 +153,7 @@ export const reportsRouter = router({
         userId: ctx.user.id,
         droneDetails: droneDetails ? JSON.stringify(droneDetails) : undefined,
         slitterDetails: slitterDetails ? JSON.stringify(slitterDetails) : undefined,
+        paintingDetails: paintingDetails ? JSON.stringify(paintingDetails) : undefined,
       });
 
       const reportId = (result as { insertId: number }).insertId;
