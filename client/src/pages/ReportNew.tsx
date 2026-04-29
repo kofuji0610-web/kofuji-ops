@@ -1853,17 +1853,79 @@ export default function ReportNew() {
           <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="w-4 h-4" />基本情報</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="workDate">作業日</Label>
-              <Input
-                id="workDate"
-                type="date"
-                value={formData.workDate}
-                onChange={(e) => setFormData((p) => ({ ...p, workDate: e.target.value }))}
-                className="mt-1"
-              />
+          {/* 業務内容（部署選択） */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-muted-foreground" />業務内容</p>
+                <p className="text-xs text-muted-foreground mt-0.5">複数の時間帯・部署にまたがる業務を追加できます</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={addWorkBlock} className="gap-1 h-8 text-xs">
+                <Plus className="w-3.5 h-3.5" />業務を追加
+              </Button>
             </div>
+            {workBlocks.map((block, i) => (
+              <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium shrink-0">業務 {i + 1}</span>
+                  <select
+                    value={block.department}
+                    onChange={(e) => updateWorkBlock(i, "department", e.target.value)}
+                    className="flex h-9 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  >
+                    {DEPARTMENT_OPTIONS.map((d) => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
+                  </select>
+                  {workBlocks.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive shrink-0 ml-auto"
+                      onClick={() => removeWorkBlock(i)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+                {block.department === "maintenance" && (
+                  <p className="text-xs text-muted-foreground">
+                    ※ 整備内容は「車両別整備記録」に入力してください
+                  </p>
+                )}
+                {block.department === "drone" && (
+                  <p className="text-xs text-sky-700 font-medium">
+                    ※ 講習内容は「講習別記録」カードに入力してください
+                  </p>
+                )}
+                {block.department === "slitter" && (
+                  <p className="text-xs text-amber-700 font-medium">
+                    ※ 裁断内容は「案件別裁断記録」カードに入力してください
+                  </p>
+                )}
+                {block.department !== "maintenance" && block.department !== "drone" && block.department !== "slitter" && (
+                  <div className="space-y-1">
+                    <textarea
+                      value={block.content}
+                      onChange={(e) => updateWorkBlock(i, "content", e.target.value)}
+                      placeholder="業務内容を入力してください"
+                      rows={2}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-border/50 pt-3">
+            <Label htmlFor="workDate">作業日</Label>
+            <Input
+              id="workDate"
+              type="date"
+              value={formData.workDate}
+              onChange={(e) => setFormData((p) => ({ ...p, workDate: e.target.value }))}
+              className="mt-1 w-48"
+            />
           </div>
           {isMaintenance && (
             <div className="rounded-lg border bg-muted/20 p-3">
@@ -1962,76 +2024,6 @@ export default function ReportNew() {
               />
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* 業務内容 */}
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2"><Briefcase className="w-4 h-4" />業務内容</CardTitle>
-            <p className="text-xs text-white/70 mt-1">
-              複数の時間帯・部署にまたがる業務を追加できます
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={addWorkBlock} className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
-            <Plus className="w-4 h-4" />
-            業務を追加
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {workBlocks.map((block, i) => (
-            <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium shrink-0">業務 {i + 1}</span>
-                <select
-                  value={block.department}
-                  onChange={(e) => updateWorkBlock(i, "department", e.target.value)}
-                  className="flex h-9 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                >
-                  {DEPARTMENT_OPTIONS.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
-                  ))}
-                </select>
-                {workBlocks.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive shrink-0 ml-auto"
-                    onClick={() => removeWorkBlock(i)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </div>
-              {block.department === "maintenance" && (
-                <p className="text-xs text-muted-foreground">
-                  ※ 整備内容は「車両別整備記録」に入力してください
-                </p>
-              )}
-              {block.department === "drone" && (
-                <p className="text-xs text-sky-700 font-medium">
-                  ※ 講習内容は「講習別記録」カードに入力してください
-                </p>
-              )}
-              {block.department === "slitter" && (
-                <p className="text-xs text-amber-700 font-medium">
-                  ※ 裁断内容は「案件別裁断記録」カードに入力してください
-                </p>
-              )}
-              {block.department !== "maintenance" && block.department !== "drone" && block.department !== "slitter" && (
-                <div className="space-y-1">
-                  <textarea
-                    value={block.content}
-                    onChange={(e) => updateWorkBlock(i, "content", e.target.value)}
-                    placeholder="業務内容を入力してください"
-                    rows={2}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                  />
-                </div>
-              )}
-            </div>
-          ))}
         </CardContent>
       </Card>
 
