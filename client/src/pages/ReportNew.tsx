@@ -719,58 +719,85 @@ function SlitterRecordBlock({
             className="h-9 text-sm" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">作業開始</Label>
-          <Input type="time" value={record.startTime}
-            onChange={(e) => {
-              const start = e.target.value;
-              const end = record.endTime;
-              let processTime = record.processTime;
-              if (start && end) {
-                const [sh, sm] = start.split(":").map(Number);
-                const [eh, em] = end.split(":").map(Number);
-                const diff = (eh * 60 + em) - (sh * 60 + sm);
-                if (diff > 0) processTime = (diff / 60).toFixed(2);
-              }
-              onChange(index, { ...record, startTime: start, processTime });
-            }}
-            className="h-9 text-sm" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">作業終了</Label>
-          <Input type="time" value={record.endTime}
-            onChange={(e) => {
-              const end = e.target.value;
-              const start = record.startTime;
-              let processTime = record.processTime;
-              if (start && end) {
-                const [sh, sm] = start.split(":").map(Number);
-                const [eh, em] = end.split(":").map(Number);
-                const diff = (eh * 60 + em) - (sh * 60 + sm);
-                if (diff > 0) processTime = (diff / 60).toFixed(2);
-              }
-              onChange(index, { ...record, endTime: end, processTime });
-            }}
-            className="h-9 text-sm" />
+      {/* 作業時間ボタン */}
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold">作業時間</Label>
+        <div className="flex items-center gap-2 flex-wrap">
+          {!record.startTime ? (
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const start = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                onChange(index, { ...record, startTime: start, processTime: "" });
+              }}
+              className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+              ▶ 作業開始
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-amber-50 border-2 border-amber-300">
+              <span className="text-xs text-amber-600 font-medium">開始</span>
+              <span className="text-sm font-bold text-amber-700">{record.startTime}</span>
+              <button
+                type="button"
+                onClick={() => onChange(index, { ...record, startTime: "", processTime: "" })}
+                className="text-xs text-amber-400 hover:text-red-500 ml-1"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {record.startTime && !record.endTime && (
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const end = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                const start = record.startTime;
+                let processTime = record.processTime;
+                if (start && end) {
+                  const [sh, sm] = start.split(":").map(Number);
+                  const [eh, em] = end.split(":").map(Number);
+                  const diff = (eh * 60 + em) - (sh * 60 + sm);
+                  if (diff > 0) processTime = (diff / 60).toFixed(2);
+                }
+                onChange(index, { ...record, endTime: end, processTime });
+              }}
+              className="h-9 px-4 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+              ■ 作業終了
+            </button>
+          )}
+          {record.endTime && (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-sky-50 border-2 border-sky-300">
+              <span className="text-xs text-sky-600 font-medium">終了</span>
+              <span className="text-sm font-bold text-sky-700">{record.endTime}</span>
+              <button
+                type="button"
+                onClick={() => onChange(index, { ...record, endTime: "", processTime: "" })}
+                className="text-xs text-sky-400 hover:text-red-500 ml-1"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {record.processTime && (
+            <div className="flex items-center gap-1 px-3 h-9 rounded-md bg-emerald-50 border-2 border-emerald-300">
+              <span className="text-xs text-emerald-600 font-medium">加工時間</span>
+              <span className="text-sm font-bold text-emerald-700">{record.processTime}</span>
+              <span className="text-xs text-emerald-500">h</span>
+            </div>
+          )}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">総仕上げm</Label>
-          <div className="flex items-center gap-1">
-            <Input placeholder="0" value={record.totalM}
-              onChange={(e) => onChange(index, { ...record, totalM: filterNum(e.target.value) })}
-              className="h-9 text-sm" />
-            <span className="text-xs text-muted-foreground shrink-0">m</span>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">加工時間（自動計算）</Label>
-          <div className="flex items-center gap-1 rounded-md bg-amber-50 border-2 border-amber-300 px-2 h-9">
-            <span className="text-sm font-semibold text-amber-700">{record.processTime || "0.00"}</span>
-            <span className="text-xs text-amber-500 ml-1">時間</span>
-          </div>
+      <div className="space-y-1">
+        <Label className="text-xs">総仕上げm</Label>
+        <div className="flex items-center gap-1">
+          <Input placeholder="0" value={record.totalM}
+            onChange={(e) => onChange(index, { ...record, totalM: filterNum(e.target.value) })}
+            className="h-9 text-sm w-28" />
+          <span className="text-xs text-muted-foreground shrink-0">m</span>
         </div>
       </div>
       <div className="space-y-1">
@@ -1433,9 +1460,6 @@ export default function ReportNew() {
         return "1MBを超える写真は添付できません";
       }
 
-    } else {
-      const hasTaskContent = tasks.some((t) => t.content.trim());
-      if (!hasTaskContent) return "作業内容を1件以上入力してください";
     }
 
     return null;
@@ -1972,41 +1996,46 @@ export default function ReportNew() {
             </div>
           )}
           {hasSlitter && (
-            <div className="rounded-lg border bg-muted/20 p-3">
-              <p className="text-xs text-muted-foreground font-medium mb-2">実績サマリー（自動集計）</p>
-              <div className="grid grid-cols-2 gap-3 flex-wrap">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-600">{slitterTotalM.toFixed(1)}</p>
-                  <p className="text-xs text-muted-foreground">本日の裁断m合計</p>
+            <div className="rounded-lg border-2 border-amber-200 bg-amber-50/60 p-3 space-y-3">
+              <p className="text-xs text-amber-700 font-bold flex items-center gap-1">✂️ スリッター 本日の実績</p>
+              {/* 本日 */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-amber-600">{slitterRecords.length}</p>
+                  <p className="text-[10px] text-muted-foreground">案件数</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-400">
-                    {((monthlySlitterSummary?.monthlyTotalM ?? 0) + slitterTotalM).toFixed(1)}
+                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-amber-600">{slitterTotalM.toFixed(1)}</p>
+                  <p className="text-[10px] text-muted-foreground">裁断m</p>
+                </div>
+                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-orange-600">
+                    {slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0).toFixed(1)}
                   </p>
-                  <p className="text-xs text-muted-foreground">今月の裁断m（本日含む）</p>
+                  <p className="text-[10px] text-muted-foreground">加工時間(h)</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-600">
-                    {slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">本日の加工時間</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-orange-400">
-                    {((monthlySlitterSummary?.monthlyProcessTime ?? 0) +
-                      slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0)).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">今月の加工時間（本日含む）</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">{slitterRecords.length}</p>
-                  <p className="text-xs text-muted-foreground">本日の案件数</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-400">
+              </div>
+              {/* 今月累計 */}
+              <p className="text-xs text-amber-600 font-semibold">今月累計（本日含む）</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-amber-500">
                     {(monthlySlitterSummary?.monthlyCaseCount ?? 0) + slitterRecords.length}
                   </p>
-                  <p className="text-xs text-muted-foreground">今月の案件数（本日含む）</p>
+                  <p className="text-[10px] text-muted-foreground">案件数</p>
+                </div>
+                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-amber-500">
+                    {((monthlySlitterSummary?.monthlyTotalM ?? 0) + slitterTotalM).toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">裁断m</p>
+                </div>
+                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
+                  <p className="text-xl font-bold text-orange-400">
+                    {((monthlySlitterSummary?.monthlyProcessTime ?? 0) +
+                      slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0)).toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">加工時間(h)</p>
                 </div>
               </div>
             </div>
@@ -3093,63 +3122,6 @@ export default function ReportNew() {
           </Card>
 
         </>
-      ) : (
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2"><FileText className="w-4 h-4" />タスク明細</CardTitle>
-            <Button variant="outline" size="sm" onClick={addTask} className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
-              <Plus className="w-4 h-4" />
-              追加
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {tasks.map((task, i) => (
-              <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">作業 {i + 1}</p>
-                  {tasks.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => removeTask(i)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="車番"
-                    value={task.vehicleNumber}
-                    onChange={(e) => updateTask(i, "vehicleNumber", e.target.value)}
-                  />
-                  <Input
-                    placeholder="作業種別"
-                    value={task.taskType}
-                    onChange={(e) => updateTask(i, "taskType", e.target.value)}
-                  />
-                </div>
-                <textarea
-                  placeholder="作業内容"
-                  value={task.content}
-                  onChange={(e) => updateTask(i, "content", e.target.value)}
-                  rows={2}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={task.isCompleted}
-                    onChange={(e) => updateTask(i, "isCompleted", e.target.checked)}
-                    className="rounded"
-                  />
-                  完了
-                </label>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       )}
 
       {/* 送信ボタン（整備・非整備共通） */}
