@@ -375,6 +375,7 @@ interface WorkBlockForm {
   department: string;
   start: string;
   end: string;
+  content: string;
 }
 
 interface MaintenanceDetailForm {
@@ -444,8 +445,8 @@ const initialFormData = (today: string, department?: string) => ({
   sharedInfo: "",
   orderInfo: "",
   isShared: false,
-  breakStart: "12:00",
-  breakEnd: "13:00",
+  breakStart: "",
+  breakEnd: "",
 });
 
 const emptyDetail = (): MaintenanceDetailForm => ({
@@ -526,12 +527,14 @@ export default function ReportNew() {
     { vehicleNumber: "", taskType: "", content: "", isCompleted: false },
   ]);
   const [workBlocks, setWorkBlocks] = useState<WorkBlockForm[]>([
-    { department: user?.department ?? "maintenance", start: "08:00", end: "17:00" },
+    { department: user?.department ?? "maintenance", start: "", end: "", content: "" },
   ]);
   const [maintenanceVehicles, setMaintenanceVehicles] = useState<MaintenanceVehicleForm[]>([
     emptyVehicle(),
   ]);
   const [maintenanceMemo, setMaintenanceMemo] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [breakIsActive, setBreakIsActive] = useState(false);
   const draftStorageKey = user?.id ? `reportNewDraft:${user.id}` : null;
 
   const monthStart = useMemo(() => {
@@ -625,13 +628,17 @@ export default function ReportNew() {
   };
 
   const createMutation = trpc.reports.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (draftStorageKey && typeof window !== "undefined") {
         window.localStorage.removeItem(draftStorageKey);
       }
       utils.reports.list.invalidate();
-      toast.success("日報を保存しました");
-      navigate(`/reports/${data.id}`);
+      if (variables.status === "submitted") {
+        setIsSubmitted(true);
+      } else {
+        toast.success("日報を保存しました");
+        navigate(`/reports/${data.id}`);
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -662,7 +669,7 @@ export default function ReportNew() {
   };
 
   const addWorkBlock = () => {
-    setWorkBlocks((prev) => [...prev, { department: "maintenance", start: "", end: "" }]);
+    setWorkBlocks((prev) => [...prev, { department: user?.department ?? "maintenance", start: "", end: "", content: "" }]);
   };
 
   const removeWorkBlock = (index: number) => {
@@ -1002,7 +1009,12 @@ export default function ReportNew() {
     if (!raw) return;
     try {
       const snapshot = JSON.parse(raw) as Partial<ReportDraftSnapshot>;
-      if (snapshot.formData) setFormData(snapshot.formData);
+      if (snapshot.formData) setFormData((prev) => ({
+        ...snapshot.formData!,
+        breakStart: "",
+        breakEnd: "",
+        workDate: snapshot.formData!.workDate ?? prev.workDate,
+      }));
       if (snapshot.tasks) setTasks(snapshot.tasks);
       if (snapshot.workBlocks) setWorkBlocks(snapshot.workBlocks);
       if (snapshot.maintenanceVehicles) {
@@ -1178,8 +1190,15 @@ export default function ReportNew() {
         if (draftStorageKey && typeof window !== "undefined") {
           window.localStorage.removeItem(draftStorageKey);
         }
-        toast.success(status === "submitted" ? "整備日報を提出しました" : "整備日報を保存しました");
-        navigate(`/maintenance/${report.id}`);
+        if (status === "submitted") {
+          if (draftStorageKey && typeof window !== "undefined") {
+            window.localStorage.removeItem(draftStorageKey);
+          }
+          setIsSubmitted(true);
+        } else {
+          toast.success("整備日報を保存しました");
+          navigate(`/maintenance/${report.id}`);
+        }
       };
 
       saveMaintenance().catch((e) => toast.error(e.message || "整備日報の保存に失敗しました"));
@@ -1225,14 +1244,14 @@ export default function ReportNew() {
         : [];
 
     const workBlockLines = workBlocks
-      .filter((b) => b.start || b.end)
+      .filter((b) => b.department || b.content.trim())
       .map((b) => {
         const dept = DEPARTMENT_OPTIONS.find((d) => d.value === b.department)?.label ?? b.department;
-        return `${dept}: ${b.start || "--:--"}〜${b.end || "--:--"}`;
+        return b.content.trim() ? `${dept}：${b.content.trim()}` : dept;
       });
 
     const composedOrderInfo = [
-      workBlockLines.length > 0 ? `【業務時間帯】\n${workBlockLines.join("\n")}` : "",
+      workBlockLines.length > 0 ? `【業務内容】\n${workBlockLines.join("\n")}` : "",
       formData.department === "maintenance" && maintenanceMemo.trim()
         ? `【作業実績・全体備考】\n${maintenanceMemo.trim()}`
         : "",
@@ -1251,8 +1270,100 @@ export default function ReportNew() {
 
   const isMaintenance = formData.department === "maintenance" || isMaintenanceFlow;
 
+  if (isSubmitted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 px-4">
+        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+          <CheckCircle className="w-12 h-12 text-emerald-500" />
+        </div>
+        <div className="text-center space-y-3">
+          <h2 className="text-2xl font-bold text-slate-800">日報を提出しました</h2>
+          <p className="text-lg text-slate-600 leading-relaxed">
+            本日の業務お疲れさまでした。<br />
+            からだに気をつけてゆっくり休んでください。
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => navigate("/reports")}
+          className="gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          日報一覧へ戻る
+        </Button>
+      </div>
+    );
+  }
+
+  const handleBreakStart = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    setFormData((p) => ({ ...p, breakStart: `${hh}:${mm}`, breakEnd: "" }));
+    setBreakIsActive(true);
+  };
+
+  const handleBreakEnd = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    setFormData((p) => ({ ...p, breakEnd: `${hh}:${mm}` }));
+    setBreakIsActive(false);
+  };
+
   return (
     <div className="space-y-5 max-w-[860px] mx-auto pb-32">
+      {/* フローティング休憩ボタン（画面右側） */}
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-2">
+        {!breakIsActive && !formData.breakStart && (
+          <button
+            type="button"
+            onClick={handleBreakStart}
+            className="flex flex-col items-center gap-1 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white shadow-lg px-3 py-3 text-xs font-bold transition-colors"
+          >
+            <span className="text-lg">☕</span>
+            <span>休憩</span>
+            <span>開始</span>
+          </button>
+        )}
+        {breakIsActive && (
+          <>
+            <div className="rounded-xl bg-amber-100 border border-amber-300 px-2 py-1.5 text-center text-xs text-amber-700 font-medium shadow">
+              <p>休憩中</p>
+              <p className="font-bold">{formData.breakStart}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleBreakEnd}
+              className="flex flex-col items-center gap-1 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white shadow-lg px-3 py-3 text-xs font-bold transition-colors"
+            >
+              <span className="text-lg">✅</span>
+              <span>休憩</span>
+              <span>終了</span>
+            </button>
+          </>
+        )}
+        {!breakIsActive && formData.breakStart && formData.breakEnd && (
+          <div className="rounded-xl bg-slate-100 border border-slate-300 px-2 py-1.5 text-center text-xs text-slate-600 shadow">
+            <p>休憩</p>
+            <p className="font-bold">{formData.breakStart}</p>
+            <p className="text-slate-400">〜</p>
+            <p className="font-bold">{formData.breakEnd}</p>
+          </div>
+        )}
+        {!breakIsActive && formData.breakStart && !formData.breakEnd && (
+          <button
+            type="button"
+            onClick={handleBreakEnd}
+            className="flex flex-col items-center gap-1 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white shadow-lg px-3 py-3 text-xs font-bold transition-colors"
+          >
+            <span className="text-lg">✅</span>
+            <span>休憩</span>
+            <span>終了</span>
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/reports")}>
           <ArrowLeft className="w-4 h-4" />
@@ -1269,7 +1380,7 @@ export default function ReportNew() {
           <CardTitle className="text-base">基本情報</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className={`grid ${isMaintenanceFlow ? "grid-cols-1 md:grid-cols-2" : "grid-cols-2"} gap-3`}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="workDate">作業日</Label>
               <Input
@@ -1280,51 +1391,7 @@ export default function ReportNew() {
                 className="mt-1"
               />
             </div>
-            {isMaintenanceFlow && (
-              <div>
-                <Label>休憩時間</Label>
-                <div className="mt-1 grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-                  <Input
-                    id="breakStart"
-                    type="time"
-                    value={formData.breakStart}
-                    onChange={(e) => setFormData((p) => ({ ...p, breakStart: e.target.value }))}
-                  />
-                  <span className="text-muted-foreground">〜</span>
-                  <Input
-                    id="breakEnd"
-                    type="time"
-                    value={formData.breakEnd}
-                    onChange={(e) => setFormData((p) => ({ ...p, breakEnd: e.target.value }))}
-                  />
-                </div>
-              </div>
-            )}
           </div>
-          {!isMaintenanceFlow && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="breakStart">休憩開始</Label>
-                <Input
-                  id="breakStart"
-                  type="time"
-                  value={formData.breakStart}
-                  onChange={(e) => setFormData((p) => ({ ...p, breakStart: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="breakEnd">休憩終了</Label>
-                <Input
-                  id="breakEnd"
-                  type="time"
-                  value={formData.breakEnd}
-                  onChange={(e) => setFormData((p) => ({ ...p, breakEnd: e.target.value }))}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          )}
           {isMaintenance && (
             <div className="rounded-lg border bg-muted/20 p-3">
               <p className="text-xs text-muted-foreground font-medium mb-2">実績サマリー（自動集計）</p>
@@ -1373,40 +1440,47 @@ export default function ReportNew() {
         <CardContent className="space-y-3">
           {workBlocks.map((block, i) => (
             <div key={i} className="border rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">業務 {i + 1}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium shrink-0">業務 {i + 1}</span>
+                <select
+                  value={block.department}
+                  onChange={(e) => updateWorkBlock(i, "department", e.target.value)}
+                  className="flex h-9 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                >
+                  {DEPARTMENT_OPTIONS.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
                 {workBlocks.length > 1 && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-destructive"
+                    className="h-7 w-7 text-destructive shrink-0 ml-auto"
                     onClick={() => removeWorkBlock(i)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <select
-                  value={block.department}
-                  onChange={(e) => updateWorkBlock(i, "department", e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {DEPARTMENT_OPTIONS.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
-                  ))}
-                </select>
-                <Input
-                  type="time"
-                  value={block.start}
-                  onChange={(e) => updateWorkBlock(i, "start", e.target.value)}
-                />
-                <Input
-                  type="time"
-                  value={block.end}
-                  onChange={(e) => updateWorkBlock(i, "end", e.target.value)}
-                />
-              </div>
+              {block.department !== "maintenance" && (
+                <div className="space-y-1">
+                  {i > 0 && (
+                    <p className="text-xs text-amber-600 font-medium">（仮）このフォームは現在設定中です</p>
+                  )}
+                  <textarea
+                    value={block.content}
+                    onChange={(e) => updateWorkBlock(i, "content", e.target.value)}
+                    placeholder="業務内容を入力してください"
+                    rows={2}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                  />
+                </div>
+              )}
+              {block.department === "maintenance" && (
+                <p className="text-xs text-muted-foreground">
+                  ※ 整備内容は「車両別整備記録」に入力してください
+                </p>
+              )}
             </div>
           ))}
         </CardContent>
@@ -2486,26 +2560,25 @@ export default function ReportNew() {
         </Card>
       )}
 
-      {/* 非整備部門の送信ボタン */}
-      {!isMaintenance && (
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => handleSubmit("draft")}
-            disabled={createMutation.isPending}
-          >
-            下書き保存
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={() => handleSubmit("submitted")}
-            disabled={createMutation.isPending}
-          >
-            提出
-          </Button>
-        </div>
-      )}
+      {/* 送信ボタン（整備・非整備共通） */}
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => handleSubmit("draft")}
+          disabled={createMutation.isPending}
+        >
+          下書き保存
+        </Button>
+        <Button
+          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+          onClick={() => handleSubmit("submitted")}
+          disabled={createMutation.isPending}
+        >
+          <CheckCircle className="w-4 h-4 mr-2" />
+          日報を提出する
+        </Button>
+      </div>
     </div>
   );
 }
