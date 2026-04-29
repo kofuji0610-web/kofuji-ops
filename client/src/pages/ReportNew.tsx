@@ -1992,42 +1992,42 @@ export default function ReportNew() {
             </div>
           )}
           {hasSlitter && (
-            <div className="rounded-lg border-2 border-amber-200 bg-amber-50/60 p-3 space-y-3">
-              <p className="text-xs text-amber-700 font-bold flex items-center gap-1">✂️ スリッター 本日の実績</p>
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">実績サマリー（自動集計）</p>
               {/* 本日 */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-amber-600">{slitterRecords.length}</p>
+                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-700">{slitterRecords.length}</p>
                   <p className="text-[10px] text-muted-foreground">案件数</p>
                 </div>
-                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-amber-600">{slitterTotalM.toFixed(1)}</p>
+                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-700">{slitterTotalM.toFixed(1)}</p>
                   <p className="text-[10px] text-muted-foreground">裁断m</p>
                 </div>
-                <div className="bg-white rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-orange-600">
+                <div className="bg-white rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-700">
                     {slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0).toFixed(1)}
                   </p>
                   <p className="text-[10px] text-muted-foreground">加工時間(h)</p>
                 </div>
               </div>
               {/* 今月累計 */}
-              <p className="text-xs text-amber-600 font-semibold">今月累計（本日含む）</p>
+              <p className="text-xs text-muted-foreground font-medium">今月累計（本日含む）</p>
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-amber-500">
+                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-500">
                     {(monthlySlitterSummary?.monthlyCaseCount ?? 0) + slitterRecords.length}
                   </p>
                   <p className="text-[10px] text-muted-foreground">案件数</p>
                 </div>
-                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-amber-500">
+                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-500">
                     {((monthlySlitterSummary?.monthlyTotalM ?? 0) + slitterTotalM).toFixed(1)}
                   </p>
                   <p className="text-[10px] text-muted-foreground">裁断m</p>
                 </div>
-                <div className="bg-amber-100/60 rounded-lg border border-amber-200 p-2 text-center">
-                  <p className="text-xl font-bold text-orange-400">
+                <div className="bg-sky-50 rounded-lg border border-sky-200 p-2 text-center">
+                  <p className="text-xl font-bold text-sky-500">
                     {((monthlySlitterSummary?.monthlyProcessTime ?? 0) +
                       slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0)).toFixed(1)}
                   </p>
@@ -2117,18 +2117,27 @@ export default function ReportNew() {
           </CardHeader>
           <CardContent className="space-y-2">
             {slitterRecords.map((r, i) => {
-              if (!r.startTime && !r.endTime) return null;
+              if (!r.startTime && !r.endTime && !r.totalM) return null;
               return (
-                <div key={i} className="flex items-center justify-between rounded-md border-2 border-stone-300 bg-white px-3 py-2 text-sm">
-                  <span className="text-slate-700 font-medium">
-                    {r.clientName ? r.clientName : `案件${i + 1}`}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-600">
-                      {r.startTime || "--:--"} 〜 {r.endTime || "--:--"}
-                    </span>
-                    {r.processTime && (
-                      <span className="text-amber-700 font-semibold">{r.processTime}h</span>
+                <div key={i} className="rounded-md border-2 border-stone-300 bg-white px-3 py-2 text-sm space-y-1">
+                  <p className="font-semibold text-sky-900 text-xs">
+                    {r.clientName ? r.clientName : `案件 ${VEHICLE_LABELS[i]}`}
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">裁断</span>
+                      <span className="font-bold text-sky-700">{r.totalM || "0"}</span>
+                      <span className="text-[10px] text-muted-foreground">m</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground">加工時間</span>
+                      <span className="font-bold text-sky-700">{r.processTime || "--"}</span>
+                      <span className="text-[10px] text-muted-foreground">h</span>
+                    </div>
+                    {(r.startTime || r.endTime) && (
+                      <span className="text-[10px] text-slate-400 ml-auto">
+                        {r.startTime || "--:--"} 〜 {r.endTime || "--:--"}
+                      </span>
                     )}
                   </div>
                 </div>
