@@ -2134,8 +2134,8 @@ export default function ReportNew() {
             })}
             {/* 全案件合計 */}
             {(() => {
-              const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
-              if (done.length < 2) return null;
+                  const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
+                  if (done.length < 1) return null;
               const totalH = done.reduce((sum, r) => sum + (parseFloat(r.processTime) || 0), 0);
               if (totalH <= 0) return null;
               const totalMin = Math.round(totalH * 60);
@@ -3116,7 +3116,7 @@ export default function ReportNew() {
                 {/* 全車両の合計時間 */}
                 {(() => {
                   const completedVehicles = maintenanceVehicles.filter((v) => v.workStart && v.workEnd);
-                  if (completedVehicles.length < 2) return null;
+                  if (completedVehicles.length < 1) return null;
                   const totalMin = completedVehicles.reduce((sum, v) => {
                     const [sh, sm] = v.workStart.split(":").map(Number);
                     const [eh, em] = v.workEnd.split(":").map(Number);
