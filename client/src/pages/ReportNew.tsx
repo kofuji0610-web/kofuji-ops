@@ -2153,7 +2153,7 @@ export default function ReportNew() {
         </Card>
       )}
 
-      {isMaintenance ? (
+      {isMaintenance && (
         <>
           {/* 車両別整備記録 */}
           <Card>
