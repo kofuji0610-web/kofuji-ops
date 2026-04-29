@@ -2132,20 +2132,33 @@ export default function ReportNew() {
                 </div>
               );
             })}
-            {/* 全案件合計 */}
+            {/* 全案件合計（複数案件のとき） */}
             {(() => {
-                  const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
-                  if (done.length < 1) return null;
+              const done = slitterRecords.filter((r) => r.startTime && r.endTime && r.processTime);
+              if (done.length < 2) return null;
               const totalH = done.reduce((sum, r) => sum + (parseFloat(r.processTime) || 0), 0);
-              if (totalH <= 0) return null;
+              const totalM = slitterRecords.reduce((sum, r) => sum + (parseFloat(r.totalM) || 0), 0);
               const totalMin = Math.round(totalH * 60);
               const h = Math.floor(totalMin / 60);
               const m = totalMin % 60;
-              const label = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
+              const timeLabel = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
               return (
-                <div className="flex items-center justify-between rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-2 text-sm mt-1">
-                  <span className="text-amber-950 font-semibold">全案件 合計作業時間</span>
-                  <span className="text-amber-800 font-bold text-base">{label}</span>
+                <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-2 mt-1 space-y-1">
+                  <p className="text-xs font-bold text-amber-800">全 {done.length} 案件 合計</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-base font-bold text-amber-700">{done.length}</p>
+                      <p className="text-[10px] text-muted-foreground">案件数</p>
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-amber-700">{totalM.toFixed(1)}</p>
+                      <p className="text-[10px] text-muted-foreground">裁断m</p>
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-amber-700">{timeLabel}</p>
+                      <p className="text-[10px] text-muted-foreground">加工時間</p>
+                    </div>
+                  </div>
                 </div>
               );
             })()}
