@@ -269,7 +269,7 @@ export default function AdminUsers() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-7 w-7 ${user.isActive ? "text-destructive" : "text-green-600"}`}
+                      className={`h-7 w-7 ${user.isActive ? "text-destructive" : "text-sky-700"}`}
                       onClick={() =>
                         toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })
                       }

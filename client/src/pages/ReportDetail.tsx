@@ -26,7 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_CLASSES: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
   submitted: "bg-blue-100 text-blue-800",
-  approved: "bg-green-100 text-green-800",
+  approved: "bg-sky-100 text-sky-800",
   rejected: "bg-red-100 text-red-800",
 };
 
@@ -112,7 +112,7 @@ export default function ReportDetail() {
               {tasks.map((task) => (
                 <div key={task.id} className="flex items-start gap-3 py-2 border-b last:border-0">
                   {task.isCompleted ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-sky-600 mt-0.5 shrink-0" />
                   ) : (
                     <Circle className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                   )}

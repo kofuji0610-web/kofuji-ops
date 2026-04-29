@@ -2,50 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Company palette（濃紺 → 紺青 → 水色 → 薄い水色）
+ * アプリ全体をブランドトーンに統一
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    /* ベース背景は薄い水色寄り（グラデーションと調和） */
+    --background: 195 48% 97%;
+    --foreground: 218 42% 14%;
+    --card: 210 40% 99%;
+    --card-foreground: 218 42% 14%;
+    --popover: 210 40% 99%;
+    --popover-foreground: 218 42% 14%;
+    /* Primary：紺青（ボタン・アクセント） */
+    --primary: 215 52% 34%;
+    --primary-foreground: 210 45% 98%;
+    --secondary: 205 42% 93%;
+    --secondary-foreground: 218 42% 18%;
+    --muted: 200 38% 93%;
+    --muted-foreground: 215 22% 38%;
+    --accent: 192 55% 94%;
+    --accent-foreground: 218 42% 18%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    /* 枠線：水色系で統一 */
+    --border: 202 32% 78%;
+    --input: 202 32% 78%;
+    --ring: 205 55% 42%;
     --radius: 0.5rem;
+
+    /* グラデーション用（任意値・コンポーネントから参照） */
+    --brand-deep-navy: 218 52% 18%;
+    --brand-navy: 215 48% 28%;
+    --brand-blue: 206 46% 42%;
+    --brand-aqua: 192 52% 52%;
+    --brand-pale-aqua: 195 55% 94%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 218 42% 10%;
+    --foreground: 195 40% 96%;
+    --card: 218 38% 14%;
+    --card-foreground: 195 40% 96%;
+    --popover: 218 38% 14%;
+    --popover-foreground: 195 40% 96%;
+    --primary: 195 55% 52%;
+    --primary-foreground: 218 45% 12%;
+    --secondary: 215 35% 22%;
+    --secondary-foreground: 195 35% 92%;
+    --muted: 215 28% 22%;
+    --muted-foreground: 200 18% 72%;
+    --accent: 215 35% 24%;
+    --accent-foreground: 195 40% 96%;
+    --destructive: 0 62% 45%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 215 28% 28%;
+    --input: 215 28% 28%;
+    --ring: 195 55% 52%;
+  }
+}
+
+@layer components {
+  /* CardHeader グラデーション内のフォーム要素を白系に統一 */
+  .card-header-gradient input,
+  .card-header-gradient select,
+  .card-header-gradient button:not([class*="bg-"]) {
+    @apply border-white/40 bg-white/15 text-white;
   }
 }
 
@@ -54,7 +77,27 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground min-h-screen;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* 全体は読みやすい薄い水色ベース + ブランド4色のごく淡いグラデーション */
+    background-color: hsl(var(--background));
+    background-image: linear-gradient(
+      165deg,
+      hsl(var(--brand-pale-aqua)) 0%,
+      hsl(198 48% 96%) 35%,
+      hsl(205 42% 97%) 65%,
+      hsl(210 38% 98%) 100%
+    ),
+      radial-gradient(
+        ellipse 140% 55% at 100% -15%,
+        hsl(var(--brand-deep-navy) / 0.07),
+        transparent 58%
+      ),
+      radial-gradient(
+        ellipse 120% 45% at 0% 105%,
+        hsl(var(--brand-aqua) / 0.06),
+        transparent 55%
+      );
+    background-attachment: fixed;
   }
 }

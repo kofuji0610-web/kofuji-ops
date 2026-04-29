@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, Wrench } from "lucide-react";
+import { Plus, Wrench, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { trpc } from "../lib/trpc";
@@ -54,7 +54,7 @@ export default function MaintenanceList() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-sm">検索・絞り込み</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2"><Search className="w-3.5 h-3.5" />検索・絞り込み</CardTitle>
             <Button
               variant="ghost"
               size="sm"

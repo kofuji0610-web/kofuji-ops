@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, Plus, Play, Trash2, Ruler, Wrench, CheckCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Camera, Plus, Play, Trash2, Ruler, Wrench, CheckCircle, RotateCcw, ClipboardList, Briefcase, Truck, Clock, FileText, MessageSquare, Timer, StickyNote, Car, MapPin, Gauge, Tag, Package, AlertTriangle, ShieldCheck, Settings2, ListOrdered, ClipboardCheck, Send } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -358,9 +358,9 @@ const PURPOSE_DETAIL_DEFAULTS: Record<
 };
 
 const OVERALL_JUDGMENT_OPTIONS = [
-  { value: "good" as const, label: "良好", activeClass: "bg-emerald-500 text-white border-emerald-500", inactiveClass: "border-emerald-200 text-emerald-700 hover:bg-emerald-50" },
-  { value: "caution" as const, label: "要注意", activeClass: "bg-yellow-400 text-white border-yellow-400", inactiveClass: "border-yellow-200 text-yellow-700 hover:bg-yellow-50" },
-  { value: "next_service" as const, label: "次回要整備", activeClass: "bg-orange-500 text-white border-orange-500", inactiveClass: "border-orange-200 text-orange-700 hover:bg-orange-50" },
+  { value: "good" as const, label: "良好", activeClass: "bg-sky-600 text-white border-sky-600", inactiveClass: "border-sky-200 text-sky-800 hover:bg-sky-50" },
+  { value: "caution" as const, label: "要注意", activeClass: "bg-sky-800 text-white border-sky-800", inactiveClass: "border-sky-300 text-sky-900 hover:bg-sky-100" },
+  { value: "next_service" as const, label: "次回要整備", activeClass: "bg-sky-700 text-white border-sky-700", inactiveClass: "border-sky-300 text-sky-800 hover:bg-sky-50" },
   { value: "no_drive" as const, label: "運行不可", activeClass: "bg-red-600 text-white border-red-600", inactiveClass: "border-red-200 text-red-700 hover:bg-red-50" },
 ];
 
@@ -1273,8 +1273,8 @@ export default function ReportNew() {
   if (isSubmitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 px-4">
-        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
-          <CheckCircle className="w-12 h-12 text-emerald-500" />
+        <div className="w-20 h-20 rounded-full bg-sky-100 flex items-center justify-center">
+          <CheckCircle className="w-12 h-12 text-sky-600" />
         </div>
         <div className="text-center space-y-3">
           <h2 className="text-2xl font-bold text-slate-800">日報を提出しました</h2>
@@ -1312,14 +1312,14 @@ export default function ReportNew() {
   };
 
   return (
-    <div className="space-y-5 max-w-[860px] mx-auto pb-32">
+    <div className="space-y-5 max-w-[860px] mx-auto pb-32 px-2">
       {/* フローティング休憩ボタン（画面右側） */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-2">
         {!breakIsActive && !formData.breakStart && (
           <button
             type="button"
             onClick={handleBreakStart}
-            className="flex flex-col items-center gap-1 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white shadow-lg px-3 py-3 text-xs font-bold transition-colors"
+            className="flex flex-col items-center gap-1 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-3 py-3 text-xs font-bold transition-colors"
           >
             <span className="text-lg">☕</span>
             <span>休憩</span>
@@ -1328,7 +1328,7 @@ export default function ReportNew() {
         )}
         {breakIsActive && (
           <>
-            <div className="rounded-xl bg-amber-100 border border-amber-300 px-2 py-1.5 text-center text-xs text-amber-700 font-medium shadow">
+            <div className="rounded-xl bg-sky-100 border border-sky-300 px-2 py-1.5 text-center text-xs text-sky-900 font-medium shadow">
               <p>休憩中</p>
               <p className="font-bold">{formData.breakStart}</p>
             </div>
@@ -1377,7 +1377,7 @@ export default function ReportNew() {
       {/* 基本情報 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">基本情報</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="w-4 h-4" />基本情報</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -1427,19 +1427,19 @@ export default function ReportNew() {
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-base">業務内容</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
+            <CardTitle className="text-base flex items-center gap-2"><Briefcase className="w-4 h-4" />業務内容</CardTitle>
+            <p className="text-xs text-white/70 mt-1">
               複数の時間帯・部署にまたがる業務を追加できます
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={addWorkBlock} className="gap-1">
+          <Button variant="outline" size="sm" onClick={addWorkBlock} className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
             <Plus className="w-4 h-4" />
             業務を追加
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           {workBlocks.map((block, i) => (
-            <div key={i} className="border rounded-lg p-3 space-y-2">
+            <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium shrink-0">業務 {i + 1}</span>
                 <select
@@ -1465,7 +1465,7 @@ export default function ReportNew() {
               {block.department !== "maintenance" && (
                 <div className="space-y-1">
                   {i > 0 && (
-                    <p className="text-xs text-amber-600 font-medium">（仮）このフォームは現在設定中です</p>
+                    <p className="text-xs text-sky-800 font-medium">（仮）このフォームは現在設定中です</p>
                   )}
                   <textarea
                     value={block.content}
@@ -1512,7 +1512,7 @@ export default function ReportNew() {
               }}
             >
               {maintenanceVehicles.map((vehicle, vi) => (
-                <div key={vi} className="border border-sky-200 rounded-xl p-3.5 space-y-3 bg-sky-50/20">
+                <div key={vi} className="border-2 border-sky-300 rounded-xl p-3.5 space-y-3 bg-white shadow-sm">
                   {/* A) 車両ヘッダー */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-sky-900">🚚 車両 {vi + 1}</p>
@@ -1532,7 +1532,7 @@ export default function ReportNew() {
 
                   {/* B) 車種 */}
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs w-16 text-right shrink-0">車種 *</Label>
+                    <Label className="text-xs w-16 text-right shrink-0 flex items-center justify-end gap-1"><Car className="w-3 h-3" />車種 *</Label>
                     <select
                       value={vehicle.vehicleType}
                       onChange={(e) => updateVehicle(vi, "vehicleType", e.target.value)}
@@ -1555,7 +1555,7 @@ export default function ReportNew() {
 
                   {/* C) 拠点・車番 */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <Label className="text-xs w-16 text-right shrink-0">拠点</Label>
+                    <Label className="text-xs w-16 text-right shrink-0 flex items-center justify-end gap-1"><MapPin className="w-3 h-3" />拠点</Label>
                     <select
                       value={vehicle.vehicleBase}
                       onChange={(e) => updateVehicle(vi, "vehicleBase", e.target.value)}
@@ -1588,7 +1588,7 @@ export default function ReportNew() {
 
                   {/* D) 走行距離 */}
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs w-16 text-right shrink-0">走行距離</Label>
+                    <Label className="text-xs w-16 text-right shrink-0 flex items-center justify-end gap-1"><Gauge className="w-3 h-3" />走行距離</Label>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -1605,7 +1605,7 @@ export default function ReportNew() {
 
                   {/* E) 作業時間 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs">作業時間</Label>
+                    <Label className="text-xs flex items-center gap-1"><Clock className="w-3 h-3" />作業時間</Label>
                     {!vehicle.workStart && !vehicle.workEnd ? (
                       <Button
                         type="button"
@@ -1640,7 +1640,7 @@ export default function ReportNew() {
 
                   {/* F) 入庫目的 */}
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">入庫目的 *</p>
+                    <p className="text-xs text-muted-foreground font-medium flex items-center gap-1"><Tag className="w-3 h-3" />入庫目的 *</p>
                     {MAINTENANCE_PURPOSE_GROUPS.map((group) => {
                       const hasLinked = group.label === "定期メンテナンス" || group.label === "修理・緊急対応";
                       return (
@@ -1648,7 +1648,7 @@ export default function ReportNew() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-slate-600">{group.label}</span>
                             {hasLinked && (
-                              <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded px-1 py-0.5">
+                              <span className="text-[10px] bg-sky-100 text-sky-900 border border-sky-300 rounded px-1 py-0.5">
                                 明細連動
                               </span>
                             )}
@@ -1683,7 +1683,7 @@ export default function ReportNew() {
                   </div>
 
                   {/* G) 整備明細 */}
-                  <div className="space-y-2.5 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+                  <div className="space-y-2.5 rounded-lg border-2 border-sky-300 bg-sky-50/80 p-3">
                     <p className="text-xs font-medium text-muted-foreground">🔧 整備明細 {vehicle.details.length}件</p>
 
                     {vehicle.details.map((detail, di) => {
@@ -1692,11 +1692,11 @@ export default function ReportNew() {
                       return (
                         <div
                           key={di}
-                          className="rounded-md border border-amber-200/80 bg-white p-3 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+                          className="rounded-md border border-sky-200/90 bg-white p-3 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
                         >
                           {/* 明細ヘッダー */}
-                          <div className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-100/60 px-2.5 py-1.5">
-                            <p className="text-xs font-semibold text-amber-800">整備明細 {di + 1}</p>
+                          <div className="flex items-center justify-between rounded-md border border-sky-200 bg-sky-100/70 px-2.5 py-1.5">
+                            <p className="text-xs font-semibold text-sky-900">整備明細 {di + 1}</p>
                             {vehicle.details.length > 1 && (
                               <button
                                 type="button"
@@ -1710,7 +1710,7 @@ export default function ReportNew() {
 
                           {/* 問題なし / 要注意 */}
                           <div className="flex items-center gap-3 flex-wrap">
-                            <label className="flex items-center gap-1.5 text-sm border border-emerald-100 bg-emerald-50/50 text-emerald-700 rounded-md px-2.5 py-1.5 cursor-pointer">
+                            <label className="flex items-center gap-1.5 text-sm border border-sky-200 bg-sky-50 text-sky-900 rounded-md px-2.5 py-1.5 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={detail.noIssue}
@@ -1723,19 +1723,19 @@ export default function ReportNew() {
                               />
                               問題なし
                             </label>
-                            <label className="flex items-center gap-1.5 text-sm border border-orange-100 bg-orange-50/50 text-orange-700 rounded-md px-2.5 py-1.5 cursor-pointer">
+                            <label className="flex items-center gap-1.5 text-sm border border-slate-300 bg-slate-50 text-slate-800 rounded-md px-2.5 py-1.5 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={detail.requiresAttention}
                                 onChange={(e) => updateVehicleDetail(vi, di, "requiresAttention", e.target.checked)}
                               />
-                              ⚠ 要運行管理連絡
+                              ⚠️ 要運行管理連絡
                             </label>
                           </div>
 
                           {/* カテゴリ */}
                           <div className="space-y-1.5">
-                            <p className="text-xs font-medium text-muted-foreground">整備部位カテゴリ *</p>
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Wrench className="w-3 h-3" />整備部位カテゴリ *</p>
                             <div className="grid grid-cols-3 gap-1.5">
                               {MAINTENANCE_CATEGORIES.map((cat) => (
                                 <button
@@ -1745,10 +1745,10 @@ export default function ReportNew() {
                                     updateVehicleDetail(vi, di, "category", cat);
                                     updateVehicleDetail(vi, di, "inspectionItems", []);
                                   }}
-                                  className={`h-9 rounded-lg border text-xs transition-colors ${
+                                  className={`h-9 rounded-lg border-2 text-xs font-medium transition-colors ${
                                     detail.category === cat
-                                      ? "border-blue-300 bg-blue-50 text-blue-700 font-medium"
-                                      : "border-input hover:bg-muted/40"
+                                      ? "border-blue-400 bg-blue-50 text-blue-700"
+                                      : "border-stone-300 bg-white hover:bg-stone-50 text-stone-700"
                                   }`}
                                 >
                                   {cat}
@@ -1768,7 +1768,7 @@ export default function ReportNew() {
                           {/* 点検項目 */}
                           {detail.category && (
                             <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">点検項目</p>
+                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><CheckCircle className="w-3 h-3" />点検項目</p>
                               <div className="grid grid-cols-2 gap-1.5">
                                 {allItems.map((item) => {
                                   const selected = (detail.inspectionItems ?? []).includes(item);
@@ -1827,7 +1827,7 @@ export default function ReportNew() {
                           {/* 整備内容（状態・処置 + 測定値 + 交換・補充内容インライン） */}
                           {!detail.noIssue && detail.inspectionItems.length > 0 && (
                             <div className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">整備内容</p>
+                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><ClipboardList className="w-3 h-3" />整備内容</p>
                               <div className="space-y-1.5">
                                 {detail.inspectionItems.map((item) => {
                                   const measurement = INSPECTION_ITEM_MEASUREMENTS[item];
@@ -1865,15 +1865,15 @@ export default function ReportNew() {
                                   return (
                                     <div
                                       key={item}
-                                      className={`rounded-md border px-2.5 py-2 space-y-2 ${
-                                        isItemNoIssue
-                                          ? "border-slate-200 bg-slate-50 opacity-60"
-                                          : "border-amber-200 bg-amber-50/50"
+                                      className={`rounded-lg border-2 px-2.5 py-2 space-y-2 ${
+                                          isItemNoIssue
+                                          ? "border-slate-300 bg-slate-50 opacity-60"
+                                          : "border-sky-300 bg-sky-50"
                                       }`}
                                     >
                                       <p
                                         className={`text-xs font-semibold ${
-                                          isItemNoIssue ? "text-slate-400 line-through" : "text-amber-800"
+                                          isItemNoIssue ? "text-slate-400 line-through" : "text-sky-900"
                                         }`}
                                       >
                                         {item}
@@ -2117,7 +2117,7 @@ export default function ReportNew() {
                           )}
 
                           {/* 追加部品（任意） */}
-                          <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/70 p-2.5">
+                          <div className="space-y-2 rounded-md border-2 border-stone-300 bg-slate-50/70 p-2.5">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-medium text-muted-foreground">追加部品（任意）</p>
                               <Button
@@ -2127,7 +2127,7 @@ export default function ReportNew() {
                                 className="h-7 px-2 text-xs"
                                 onClick={() => addDetailPart(vi, di)}
                               >
-                                + 部品追加
+                                <Package className="w-3 h-3 mr-1" />部品追加
                               </Button>
                             </div>
                             {(detail.parts ?? []).filter((p) => !p.linkedItem).length === 0 ? (
@@ -2137,7 +2137,7 @@ export default function ReportNew() {
                                 {(detail.parts ?? []).map((part, partIndex) => {
                                   if (part.linkedItem) return null;
                                   return (
-                                  <div key={partIndex} className="rounded-md border border-slate-200 bg-white p-2 space-y-2">
+                                  <div key={partIndex} className="rounded-md border-2 border-stone-200 bg-white p-2 space-y-2">
                                     <div className="grid grid-cols-2 gap-2">
                                       <select
                                         value={part.masterCategory}
@@ -2273,29 +2273,29 @@ export default function ReportNew() {
                       variant="outline"
                       size="sm"
                       onClick={() => addVehicleDetail(vi)}
-                      className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-100/40"
+                      className="w-full border-dashed border-sky-400 text-sky-900 hover:bg-sky-50"
                     >
-                      ＋ 整備明細を追加
+                      <ListOrdered className="w-4 h-4 mr-1" />整備明細を追加
                     </Button>
                   </div>
 
                   {/* I) 完了後確認チェック */}
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">完了後確認チェック</p>
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><ClipboardCheck className="w-3 h-3" />完了後確認チェック</p>
                     <div className="grid grid-cols-2 gap-2">
                       {(
                         [
-                          { key: "engineStart", label: "エンジン始動確認" },
-                          { key: "testDrive", label: "試走確認" },
-                          { key: "noLeaks", label: "漏れなし確認" },
-                          { key: "lights", label: "灯火確認" },
+                          { key: "engineStart", label: "🔑 エンジン始動確認" },
+                          { key: "testDrive", label: "🚗 試走確認" },
+                          { key: "noLeaks", label: "💧 漏れなし確認" },
+                          { key: "lights", label: "💡 灯火確認" },
                         ] as { key: keyof MaintenanceVehicleForm["completionChecks"]; label: string }[]
                       ).map(({ key, label }) => (
                         <label
                           key={key}
                           className={`flex items-center gap-2 text-xs rounded-md border px-2.5 py-2 cursor-pointer transition-colors ${
                             vehicle.completionChecks[key]
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              ? "border-sky-400 bg-sky-50 text-sky-900"
                               : "border-slate-200 bg-white text-slate-600"
                           }`}
                         >
@@ -2320,7 +2320,7 @@ export default function ReportNew() {
                     (d.parts ?? []).some((p) => p.masterCategory === "exterior")
                   ) && (
                     <div className="rounded-lg border border-violet-200 bg-violet-50/40 px-3 py-2.5 space-y-2">
-                      <p className="text-xs font-medium text-violet-800">外注依頼</p>
+                      <p className="text-xs font-medium text-violet-800 flex items-center gap-1"><Send className="w-3 h-3" />外注依頼</p>
                       <div className="flex items-center gap-2">
                         <Input
                           placeholder="外注先（例: ○○タイヤ、△△板金）"
@@ -2344,8 +2344,8 @@ export default function ReportNew() {
                   )}
 
                   {/* K) 車両総合判定 */}
-                  <div className="rounded-md border border-slate-200 bg-slate-50/50 p-2.5 space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">車両総合判定</p>
+                  <div className="rounded-md border-2 border-stone-300 bg-slate-50 p-2.5 space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><ShieldCheck className="w-3 h-3" />車両総合判定</p>
                     <div className="grid grid-cols-4 gap-1.5">
                       {OVERALL_JUDGMENT_OPTIONS.map((opt) => (
                         <button
@@ -2372,7 +2372,7 @@ export default function ReportNew() {
                   {vehicle.workStart && !vehicle.workEnd && (
                     <Button
                       type="button"
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                       onClick={() => updateVehicle(vi, "workEnd", nowTime())}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
@@ -2380,14 +2380,14 @@ export default function ReportNew() {
                     </Button>
                   )}
                   {vehicle.workStart && vehicle.workEnd && (
-                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 font-semibold flex items-center justify-between gap-2">
+                    <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900 font-semibold flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
                         合計作業時間: {calcWorkDuration(vehicle.workStart, vehicle.workEnd)}
                       </div>
                       <button
                         type="button"
-                        className="text-xs text-emerald-600 underline font-normal"
+                        className="text-xs text-sky-700 underline font-normal"
                         onClick={() => {
                           updateVehicle(vi, "workStart", "");
                           updateVehicle(vi, "workEnd", "");
@@ -2419,7 +2419,7 @@ export default function ReportNew() {
           {maintenanceVehicles.some((v) => v.workStart || v.workEnd) && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">作業時間サマリー</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2"><Timer className="w-4 h-4" />作業時間サマリー</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {maintenanceVehicles.map((v, vi) => {
@@ -2427,7 +2427,7 @@ export default function ReportNew() {
                   return (
                     <div
                       key={vi}
-                      className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                      className="flex items-center justify-between rounded-md border-2 border-stone-300 bg-white px-3 py-2 text-sm"
                     >
                       <span className="text-slate-700 font-medium">
                         {v.vehicleNumberPrefix ? `${v.vehicleNumberPrefix} ` : ""}
@@ -2438,7 +2438,7 @@ export default function ReportNew() {
                           {v.workStart || "--:--"} 〜 {v.workEnd || "--:--"}
                         </span>
                         {v.workStart && v.workEnd && (
-                          <span className="text-emerald-600 font-semibold">
+                          <span className="text-sky-700 font-semibold">
                             {calcWorkDuration(v.workStart, v.workEnd)}
                           </span>
                         )}
@@ -2460,9 +2460,9 @@ export default function ReportNew() {
                   const m = totalMin % 60;
                   const label = h > 0 ? `${h}時間${m > 0 ? `${m}分` : ""}` : `${m}分`;
                   return (
-                    <div className="flex items-center justify-between rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm mt-1">
-                      <span className="text-emerald-800 font-semibold">全車両 合計作業時間</span>
-                      <span className="text-emerald-700 font-bold text-base">{label}</span>
+                    <div className="flex items-center justify-between rounded-md border-2 border-sky-400 bg-sky-50 px-3 py-2 text-sm mt-1">
+                      <span className="text-sky-950 font-semibold">全車両 合計作業時間</span>
+                      <span className="text-sky-800 font-bold text-base">{label}</span>
                     </div>
                   );
                 })()}
@@ -2472,7 +2472,7 @@ export default function ReportNew() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">作業実績・全体備考</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><StickyNote className="w-4 h-4" />作業実績・全体備考</CardTitle>
             </CardHeader>
             <CardContent>
               <textarea
@@ -2487,7 +2487,7 @@ export default function ReportNew() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">共有事項</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><MessageSquare className="w-4 h-4" />共有事項</CardTitle>
             </CardHeader>
             <CardContent>
               <textarea
@@ -2504,15 +2504,15 @@ export default function ReportNew() {
       ) : (
         <Card>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">タスク明細</CardTitle>
-            <Button variant="outline" size="sm" onClick={addTask} className="gap-1">
+            <CardTitle className="text-base flex items-center gap-2"><FileText className="w-4 h-4" />タスク明細</CardTitle>
+            <Button variant="outline" size="sm" onClick={addTask} className="gap-1 border-white/60 text-white bg-white/15 hover:bg-white/25 hover:text-white">
               <Plus className="w-4 h-4" />
               追加
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
             {tasks.map((task, i) => (
-              <div key={i} className="border rounded-lg p-3 space-y-2">
+              <div key={i} className="border-2 border-stone-300 rounded-lg p-3 space-y-2 bg-white">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">作業 {i + 1}</p>
                   {tasks.length > 1 && (
@@ -2571,7 +2571,7 @@ export default function ReportNew() {
           下書き保存
         </Button>
         <Button
-          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
           onClick={() => handleSubmit("submitted")}
           disabled={createMutation.isPending}
         >

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { LogIn, LogOut, Download } from "lucide-react";
+import { LogIn, LogOut, Download, History } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -278,13 +278,13 @@ export default function Attendance() {
       {/* 勤怠履歴カード */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">勤怠履歴</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><History className="w-4 h-4" />勤怠履歴</CardTitle>
           <div className="flex items-center gap-2">
             <input
               type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="h-9 px-3 text-sm border rounded-md bg-background"
+              className="h-9 px-3 text-sm border border-white/50 rounded-md bg-white/20 text-white placeholder:text-white/60"
             />
             <Button
               variant="outline"

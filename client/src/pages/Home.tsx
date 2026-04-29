@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { LogIn, LogOut, Clock, Plus, CalendarDays, Users } from "lucide-react";
+import { LogIn, LogOut, Clock, Plus, CalendarDays, Users, CheckSquare, Bell } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -20,12 +20,12 @@ const DEPARTMENT_LABELS: Record<string, string> = {
 };
 
 const DEPARTMENT_CLASS: Record<string, string> = {
-  maintenance: "bg-blue-100 text-blue-800",
-  painting: "bg-green-100 text-green-800",
-  slitter: "bg-orange-100 text-orange-800",
-  drone: "bg-purple-100 text-purple-800",
-  warehouse: "bg-teal-100 text-teal-800",
-  operation: "bg-cyan-100 text-cyan-800",
+  maintenance: "bg-sky-100 text-sky-900",
+  painting: "bg-slate-100 text-slate-800",
+  slitter: "bg-slate-200 text-slate-900",
+  drone: "bg-indigo-100 text-indigo-900",
+  warehouse: "bg-cyan-100 text-cyan-900",
+  operation: "bg-sky-100 text-sky-900",
 };
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
@@ -252,17 +252,17 @@ export default function Home() {
       </div>
 
       {/* 勤怠カード */}
-      <Card className={isWorking ? "border-l-4 border-l-emerald-500 border-slate-200/80 shadow-sm" : "border-slate-200/80 shadow-sm"}>
+      <Card className={isWorking ? "border-l-4 border-l-sky-600 border-slate-200/80 shadow-sm" : "border-slate-200/80 shadow-sm"}>
         <CardContent className="pt-5 pb-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  isWorking ? "bg-emerald-100" : "bg-slate-100"
+                  isWorking ? "bg-sky-100" : "bg-slate-100"
                 }`}
               >
                 <Clock
-                  className={`w-5 h-5 ${isWorking ? "text-emerald-600" : "text-slate-500"}`}
+                  className={`w-5 h-5 ${isWorking ? "text-sky-700" : "text-slate-500"}`}
                 />
               </div>
               <div className="min-w-0">
@@ -298,7 +298,7 @@ export default function Home() {
                   size="sm"
                   onClick={handleClockIn}
                   disabled={isPunching}
-                  className="h-10 px-4 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                  className="h-10 px-4 gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   {step === 0 ? "出勤" : "再出勤"}
@@ -310,7 +310,7 @@ export default function Home() {
                   variant="outline"
                   onClick={handleClockOut}
                   disabled={isPunching}
-                  className="h-10 px-4 gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
+                  className="h-10 px-4 gap-1.5 border-sky-400 text-sky-900 hover:bg-sky-50 font-semibold"
                 >
                   <LogOut className="w-4 h-4" />
                   退勤
@@ -326,12 +326,12 @@ export default function Home() {
 
       {/* 出勤中メンバー */}
       {activeMembers && activeMembers.length > 0 && (
-        <Card className="border-emerald-100 bg-emerald-50/30 shadow-sm">
+        <Card className="border-sky-200 bg-sky-50/40 shadow-sm">
           <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-base font-semibold text-emerald-900 flex items-center gap-2">
+            <CardTitle className="text-base font-semibold text-white flex items-center gap-2 drop-shadow-sm">
               <Users className="w-4 h-4" />
               出勤中のメンバー
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+              <span className="text-xs font-semibold text-sky-950 bg-white rounded-full px-2 py-0.5 border border-white/40">
                 {activeMembers.length}人
               </span>
             </CardTitle>
@@ -345,10 +345,10 @@ export default function Home() {
                 return (
                   <div
                     key={m.user.id}
-                    className="bg-white border border-emerald-100 rounded-md px-3 py-2"
+                    className="bg-white border border-sky-200 rounded-md px-3 py-2"
                   >
                     <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <div className="w-2 h-2 rounded-full bg-sky-600" />
                       <span className="text-xs font-medium">
                         {m.user.displayName || m.user.name}
                       </span>
@@ -371,7 +371,7 @@ export default function Home() {
                     {memberSchedules.length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {memberSchedules.slice(0, 2).map((schedule) => (
-                          <div key={schedule.id} className="text-[11px] text-emerald-700 truncate">
+                          <div key={schedule.id} className="text-[11px] text-sky-800 truncate">
                             {schedule.title}　{formatTime(schedule.startAt)}
                           </div>
                         ))}
@@ -389,7 +389,7 @@ export default function Home() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Button
           size="lg"
-          className="h-12 text-base font-semibold shadow-sm hover:shadow bg-indigo-600 hover:bg-indigo-700 gap-2"
+          className="h-12 text-base font-semibold shadow-sm hover:shadow bg-primary hover:bg-primary/90 gap-2"
           onClick={() => navigate("/reports/new")}
         >
           <Plus className="w-4 h-4" />
@@ -409,10 +409,11 @@ export default function Home() {
       {/* 昨日の日報提出状況 */}
       <Card className="border-slate-200/80 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-slate-900">
+          <CardTitle className="text-lg font-bold text-white drop-shadow-sm flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 shrink-0" />
             {yesterdayLabel} の日報提出状況
             {yesterdaySubmissionStatus && (
-              <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-2.5 py-1 align-middle">
+              <span className="ml-2 text-xs font-semibold text-indigo-800 bg-white/90 rounded-full px-2.5 py-1 align-middle border border-white/50">
                 {yesterdaySubmissionStatus.submitted.length}/
                 {yesterdaySubmissionStatus.submitted.length +
                   yesterdaySubmissionStatus.unsubmitted.length}
@@ -480,13 +481,14 @@ export default function Home() {
       <Card className="border-slate-200/80 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-lg font-bold text-slate-900">
+            <CardTitle className="text-lg font-bold text-white drop-shadow-sm flex items-center gap-2">
+              <Bell className="w-4 h-4 shrink-0" />
               共有事項
-              <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-2.5 py-1 align-middle">
+              <span className="ml-2 text-xs font-semibold text-indigo-800 bg-white/90 rounded-full px-2.5 py-1 align-middle border border-white/50">
                 {sharedInfoReports.length}件
               </span>
             </CardTitle>
-            <Button variant="ghost" size="sm" className="font-semibold" onClick={() => navigate("/reports")}>
+            <Button variant="ghost" size="sm" className="font-semibold text-white hover:bg-white/15 hover:text-white" onClick={() => navigate("/reports")}>
               日報一覧
             </Button>
           </div>

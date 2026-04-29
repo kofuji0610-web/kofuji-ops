@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Calendar, ListChecks } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -13,9 +13,9 @@ import { Label } from "../components/ui/label";
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 const SCHEDULE_COLORS = [
   { value: "blue", label: "青", class: "bg-blue-500" },
-  { value: "green", label: "緑", class: "bg-green-500" },
+  { value: "green", label: "水", class: "bg-sky-500" },
   { value: "red", label: "赤", class: "bg-red-500" },
-  { value: "orange", label: "橙", class: "bg-orange-500" },
+  { value: "orange", label: "橙", class: "bg-sky-600" },
   { value: "purple", label: "紫", class: "bg-purple-500" },
 ];
 
@@ -141,7 +141,7 @@ export default function Schedule() {
       {showForm && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">新しい予定を追加</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><Plus className="w-4 h-4" />新しい予定を追加</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -268,7 +268,7 @@ export default function Schedule() {
       {schedules && schedules.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">今月の予定一覧</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><ListChecks className="w-4 h-4" />今月の予定一覧</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
