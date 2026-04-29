@@ -97,6 +97,10 @@ export const reports = mysqlTable("reports", {
   sharedInfo: text("shared_info"),
   orderInfo: text("order_info"),
   isShared: boolean("is_shared").notNull().default(false),
+  vehicleCount: int("vehicle_count"),
+  vehicleDetails: text("vehicle_details"),
+  droneDetails: text("drone_details"),
+  slitterDetails: text("slitter_details"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });

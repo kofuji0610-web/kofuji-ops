@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, gte, lte, inArray, asc } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray, asc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../lib/trpc";
 import { db } from "../db";
@@ -76,6 +76,38 @@ export const reportsRouter = router({
         sharedInfo: z.string().optional().nullable(),
         orderInfo: z.string().optional().nullable(),
         isShared: z.boolean().optional().default(false),
+        vehicleCount: z.number().optional().nullable(),
+        vehicleDetails: z.string().optional().nullable(),
+        droneDetails: z.array(z.object({
+          trainingType: z.string(),
+          trainingName: z.string().optional(),
+          count: z.number().optional(),
+          salesAmount: z.number().optional(),
+          result: z.string().optional(),
+          note: z.string().optional(),
+          attendees: z.array(z.object({
+            name: z.string(),
+            type: z.string(),
+            company: z.string().optional(),
+          })).optional(),
+        })).optional(),
+        slitterDetails: z.array(z.object({
+          clientName: z.string().optional(),
+          rawW: z.string().optional(),
+          rawL: z.string().optional(),
+          rawLen: z.string().optional(),
+          procW: z.string().optional(),
+          procL: z.string().optional(),
+          procLen: z.string().optional(),
+          honsu: z.string().optional(),
+          choTori: z.string().optional(),
+          speed: z.string().optional(),
+          totalM: z.number().optional(),
+          processTime: z.number().optional(),
+          startTime: z.string().optional(),
+          endTime: z.string().optional(),
+          note: z.string().optional(),
+        })).optional(),
         tasks: z
           .array(
             z.object({
@@ -91,12 +123,14 @@ export const reportsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { tasks, ...reportData } = input;
+      const { tasks, droneDetails, slitterDetails, ...reportData } = input;
 
       const [result] = await db.insert(reports).values({
         ...reportData,
         workDate: parseYmdToDate(reportData.workDate),
         userId: ctx.user.id,
+        droneDetails: droneDetails ? JSON.stringify(droneDetails) : undefined,
+        slitterDetails: slitterDetails ? JSON.stringify(slitterDetails) : undefined,
       });
 
       const reportId = (result as { insertId: number }).insertId;
@@ -256,6 +290,77 @@ export const reportsRouter = router({
 
     return { targetDate: ymd, submitted, unsubmitted };
   }),
+
+  // ─── ドローン月次集計（本日除く） ────────────────────────────────────────────
+  getMonthlySummary: protectedProcedure
+    .input(z.object({ workDate: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const date = new Date(input.workDate);
+      const monthStart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+      const prevDate = new Date(date);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const monthEnd = prevDate.toISOString().split("T")[0];
+      if (monthStart > monthEnd) return { totalCount: 0, totalSales: 0 };
+      const rows = await db
+        .select({ vehicleCount: reports.vehicleCount, droneDetails: reports.droneDetails })
+        .from(reports)
+        .where(
+          and(
+            eq(reports.userId, ctx.user.id),
+            eq(reports.department, "drone"),
+            sql`DATE(${reports.workDate}) >= ${monthStart}`,
+            sql`DATE(${reports.workDate}) <= ${monthEnd}`
+          )
+        );
+      let totalCount = 0;
+      let totalSales = 0;
+      for (const row of rows) {
+        totalCount += row.vehicleCount ?? 0;
+        if (row.droneDetails) {
+          try {
+            const details = JSON.parse(row.droneDetails) as Array<{ salesAmount?: number }>;
+            for (const d of details) totalSales += d.salesAmount ?? 0;
+          } catch {}
+        }
+      }
+      return { totalCount, totalSales };
+    }),
+
+  // ─── スリッター月次集計 ────────────────────────────────────────────────────
+  getMonthlySlitterSummary: protectedProcedure
+    .input(z.object({ workDate: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const date = new Date(input.workDate);
+      const monthStart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+      const monthEnd = input.workDate;
+      const rows = await db
+        .select({ vehicleCount: reports.vehicleCount, slitterDetails: reports.slitterDetails })
+        .from(reports)
+        .where(
+          and(
+            eq(reports.userId, ctx.user.id),
+            eq(reports.department, "slitter"),
+            sql`DATE(${reports.workDate}) >= ${monthStart}`,
+            sql`DATE(${reports.workDate}) <= ${monthEnd}`
+          )
+        );
+      let monthlyTotalM = 0;
+      let monthlyProcessTime = 0;
+      let monthlyCaseCount = 0;
+      for (const row of rows) {
+        monthlyCaseCount += row.vehicleCount ?? 0;
+        if (row.slitterDetails) {
+          try {
+            const details = JSON.parse(row.slitterDetails) as Array<{ totalM?: number; processTime?: number }>;
+            for (const d of details) {
+              monthlyTotalM += d.totalM ?? 0;
+              monthlyProcessTime += d.processTime ?? 0;
+            }
+          } catch {}
+        }
+      }
+      return { monthlyTotalM, monthlyProcessTime, monthlyCaseCount };
+    }),
 
   // ─── 共有情報・受注情報を取得 ────────────────────────────────────────────────
   sharedAndOrders: protectedProcedure

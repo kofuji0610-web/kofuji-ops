@@ -378,6 +378,58 @@ interface WorkBlockForm {
   content: string;
 }
 
+// ─── スリッター型 ──────────────────────────────────────────────────────────────
+type SlitterRecord = {
+  clientName: string;
+  rawW: string; rawL: string; rawLen: string;
+  procW: string; procL: string; procLen: string;
+  honsu: string; choTori: string; speed: string;
+  totalM: string; processTime: string;
+  startTime: string; endTime: string;
+  note: string;
+};
+
+const defaultSlitter = (): SlitterRecord => ({
+  clientName: "",
+  rawW: "", rawL: "", rawLen: "",
+  procW: "", procL: "", procLen: "",
+  honsu: "", choTori: "", speed: "", totalM: "", processTime: "",
+  startTime: "", endTime: "",
+  note: "",
+});
+
+// ─── ドローン型 ───────────────────────────────────────────────────────────────
+type DroneAttendee = {
+  name: string;
+  type: "個人" | "法人" | "";
+  company: string;
+};
+
+const defaultAttendee = (): DroneAttendee => ({ name: "", type: "", company: "" });
+
+type DroneRecord = {
+  trainingType: string;
+  trainingName: string;
+  salesAmount: string;
+  result: string;
+  note: string;
+  attendees: DroneAttendee[];
+};
+
+const defaultDrone = (): DroneRecord => ({
+  trainingType: "", trainingName: "", salesAmount: "", result: "", note: "", attendees: [],
+});
+
+const TASK_TYPES_DRONE = [
+  { value: "national_license", label: "国家資格講習" },
+  { value: "ntt_training",     label: "NTT講習" },
+  { value: "maintenance",      label: "機械整備" },
+  { value: "meeting",          label: "打合せ" },
+  { value: "other",            label: "その他" },
+];
+
+const VEHICLE_LABELS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+
 interface MaintenanceDetailForm {
   category: string;
   categoryOther: string;
@@ -511,6 +563,360 @@ const getAutoConditionForItems = (
   return worst;
 };
 
+// ─── MemoryInput: 入力履歴サジェスト付き入力 ─────────────────────────────────
+function MemoryInput({
+  memoryKey, value, onChange, placeholder, className,
+}: {
+  memoryKey: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [suggestions, setSuggestions] = React.useState<string[]>([]);
+  const [open, setOpen] = React.useState(false);
+  const [highlighted, setHighlighted] = React.useState(-1);
+
+  const loadHistory = (): string[] => {
+    try { return JSON.parse(localStorage.getItem(`mem_${memoryKey}`) ?? "[]"); } catch { return []; }
+  };
+
+  const saveHistory = (val: string) => {
+    if (!val.trim()) return;
+    const hist = loadHistory().filter((h) => h !== val);
+    localStorage.setItem(`mem_${memoryKey}`, JSON.stringify([val, ...hist].slice(0, 20)));
+  };
+
+  const filtered = loadHistory().filter((h) => h.includes(value) && h !== value);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        className={`flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${className ?? ""}`}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlighted(-1); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => { setTimeout(() => setOpen(false), 150); saveHistory(value); }}
+        onKeyDown={(e) => {
+          if (!open || filtered.length === 0) return;
+          if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, filtered.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); }
+          else if (e.key === "Enter" && highlighted >= 0) { e.preventDefault(); onChange(filtered[highlighted]); setOpen(false); }
+          else if (e.key === "Escape") setOpen(false);
+        }}
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full rounded-md border border-input bg-white shadow-md text-sm max-h-48 overflow-auto">
+          {filtered.map((s, i) => (
+            <li
+              key={s}
+              className={`px-3 py-1.5 cursor-pointer ${i === highlighted ? "bg-sky-100" : "hover:bg-slate-50"}`}
+              onMouseDown={() => { onChange(s); setOpen(false); setSuggestions([]); }}
+            >
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─── SlitterSizeInput ─────────────────────────────────────────────────────────
+function SlitterSizeInput({
+  label, w, l, len, onChangeW, onChangeL, onChangeLen, showParens = false,
+}: {
+  label: string; w: string; l: string; len: string;
+  onChangeW: (v: string) => void; onChangeL: (v: string) => void; onChangeLen: (v: string) => void;
+  showParens?: boolean;
+}) {
+  const filterParens = (v: string) => v.replace(/[^0-9()]/g, "");
+  const filterNum = (v: string) => v.replace(/[^0-9]/g, "");
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs font-semibold">{label}</Label>
+      <div className="flex items-center gap-1 flex-wrap">
+        <Input placeholder="例:47" value={w}
+          onChange={(e) => onChangeW(showParens ? filterParens(e.target.value) : filterNum(e.target.value))}
+          className="h-9 text-sm w-20" />
+        <span className="text-sm font-bold text-muted-foreground">×</span>
+        <Input placeholder="例:600" value={l}
+          onChange={(e) => onChangeL(filterNum(e.target.value))}
+          className="h-9 text-sm w-20" />
+        <span className="text-sm font-bold text-muted-foreground">×</span>
+        <Input placeholder="例:2000" value={len}
+          onChange={(e) => onChangeLen(filterNum(e.target.value))}
+          className="h-9 text-sm w-24" />
+      </div>
+    </div>
+  );
+}
+
+// ─── SlitterRecordBlock ───────────────────────────────────────────────────────
+function SlitterRecordBlock({
+  record, index, total, onChange, onRemove,
+}: {
+  record: SlitterRecord; index: number; total: number;
+  onChange: (index: number, updated: SlitterRecord) => void;
+  onRemove: (index: number) => void;
+}) {
+  const filterNum = (v: string) => v.replace(/[^0-9.]/g, "");
+  return (
+    <div className="border-2 border-amber-300 bg-amber-50/40 rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-amber-700">✂️ 案件 {VEHICLE_LABELS[index]}</span>
+        {total > 1 && (
+          <button type="button" onClick={() => onRemove(index)}
+            className="h-7 w-7 flex items-center justify-center rounded text-red-500 hover:bg-red-50">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">荷主名</Label>
+        <MemoryInput memoryKey="client_name" placeholder="荷主名を入力"
+          value={record.clientName}
+          onChange={(v) => onChange(index, { ...record, clientName: v })}
+          className="h-9 text-sm" />
+      </div>
+      <SlitterSizeInput label="元原紙サイズ"
+        w={record.rawW} l={record.rawL} len={record.rawLen}
+        onChangeW={(v) => onChange(index, { ...record, rawW: v })}
+        onChangeL={(v) => onChange(index, { ...record, rawL: v })}
+        onChangeLen={(v) => onChange(index, { ...record, rawLen: v })}
+        showParens={false} />
+      <SlitterSizeInput label="加工サイズ"
+        w={record.procW} l={record.procL} len={record.procLen}
+        onChangeW={(v) => onChange(index, { ...record, procW: v })}
+        onChangeL={(v) => onChange(index, { ...record, procL: v })}
+        onChangeLen={(v) => onChange(index, { ...record, procLen: v })}
+        showParens={true} />
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">本数</Label>
+          <div className="flex items-center gap-1">
+            <Input placeholder="0" value={record.honsu}
+              onChange={(e) => onChange(index, { ...record, honsu: filterNum(e.target.value) })}
+              className="h-9 text-sm" />
+            <span className="text-xs text-muted-foreground shrink-0">本</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">丁取り数</Label>
+          <div className="flex items-center gap-1">
+            <Input placeholder="0" value={record.choTori}
+              onChange={(e) => onChange(index, { ...record, choTori: filterNum(e.target.value) })}
+              className="h-9 text-sm" />
+            <span className="text-xs text-muted-foreground shrink-0">丁</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">速度</Label>
+          <Input placeholder="0" value={record.speed}
+            onChange={(e) => onChange(index, { ...record, speed: filterNum(e.target.value) })}
+            className="h-9 text-sm" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">作業開始</Label>
+          <Input type="time" value={record.startTime}
+            onChange={(e) => {
+              const start = e.target.value;
+              const end = record.endTime;
+              let processTime = record.processTime;
+              if (start && end) {
+                const [sh, sm] = start.split(":").map(Number);
+                const [eh, em] = end.split(":").map(Number);
+                const diff = (eh * 60 + em) - (sh * 60 + sm);
+                if (diff > 0) processTime = (diff / 60).toFixed(2);
+              }
+              onChange(index, { ...record, startTime: start, processTime });
+            }}
+            className="h-9 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">作業終了</Label>
+          <Input type="time" value={record.endTime}
+            onChange={(e) => {
+              const end = e.target.value;
+              const start = record.startTime;
+              let processTime = record.processTime;
+              if (start && end) {
+                const [sh, sm] = start.split(":").map(Number);
+                const [eh, em] = end.split(":").map(Number);
+                const diff = (eh * 60 + em) - (sh * 60 + sm);
+                if (diff > 0) processTime = (diff / 60).toFixed(2);
+              }
+              onChange(index, { ...record, endTime: end, processTime });
+            }}
+            className="h-9 text-sm" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">総仕上げm</Label>
+          <div className="flex items-center gap-1">
+            <Input placeholder="0" value={record.totalM}
+              onChange={(e) => onChange(index, { ...record, totalM: filterNum(e.target.value) })}
+              className="h-9 text-sm" />
+            <span className="text-xs text-muted-foreground shrink-0">m</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">加工時間（自動計算）</Label>
+          <div className="flex items-center gap-1 rounded-md bg-amber-50 border-2 border-amber-300 px-2 h-9">
+            <span className="text-sm font-semibold text-amber-700">{record.processTime || "0.00"}</span>
+            <span className="text-xs text-amber-500 ml-1">時間</span>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">備考（任意）</Label>
+        <textarea placeholder="特記事項があれば記入" value={record.note}
+          onChange={(e) => onChange(index, { ...record, note: e.target.value })}
+          rows={2}
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
+      </div>
+    </div>
+  );
+}
+
+// ─── DroneRecordBlock ─────────────────────────────────────────────────────────
+function DroneRecordBlock({
+  record, index, total, onChange, onRemove,
+}: {
+  record: DroneRecord; index: number; total: number;
+  onChange: (index: number, updated: DroneRecord) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="border-2 border-sky-300 bg-sky-50/40 rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-sky-700">🚁 講習 {VEHICLE_LABELS[index]}</span>
+        {total > 1 && (
+          <button type="button" onClick={() => onRemove(index)}
+            className="h-7 w-7 flex items-center justify-center rounded text-red-500 hover:bg-red-50">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">講習種別<span className="text-red-500 ml-1">*</span></Label>
+        <select value={record.trainingType}
+          onChange={(e) => onChange(index, { ...record, trainingType: e.target.value })}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+          <option value="">選択してください</option>
+          {TASK_TYPES_DRONE.map((t) => (
+            <option key={t.value} value={t.label}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">講習名・内容</Label>
+        <MemoryInput memoryKey="training_name"
+          placeholder="例：一等無人航空機操縦士 学科試験対策"
+          value={record.trainingName}
+          onChange={(v) => onChange(index, { ...record, trainingName: v })}
+          className="h-9 text-sm" />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-semibold text-sky-700">受講者情報</Label>
+          <Button type="button" variant="outline" size="sm"
+            className="h-7 text-xs gap-1 border-sky-300 text-sky-600 hover:bg-sky-50"
+            onClick={() => onChange(index, { ...record, attendees: [...(record.attendees ?? []), defaultAttendee()] })}>
+            <Plus className="w-3 h-3" />受講者を追加
+          </Button>
+        </div>
+        {(record.attendees ?? []).map((att, ai) => (
+          <div key={ai} className="border-2 border-sky-200 rounded-md p-3 space-y-2 bg-white">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-sky-600">受講者 {ai + 1}</div>
+              <button type="button"
+                className="h-6 w-6 flex items-center justify-center text-red-500 hover:bg-red-50 rounded"
+                onClick={() => {
+                  const updated = (record.attendees ?? []).filter((_, i) => i !== ai);
+                  onChange(index, { ...record, attendees: updated });
+                }}>
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex gap-3">
+              {(["個人", "法人"] as const).map((t) => (
+                <label key={t} className="flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name={`attendee-type-${index}-${ai}`} value={t}
+                    checked={att.type === t}
+                    onChange={() => {
+                      const updated = (record.attendees ?? []).map((a, i) =>
+                        i === ai ? { ...a, type: t, company: t === "個人" ? "" : a.company } : a
+                      );
+                      onChange(index, { ...record, attendees: updated });
+                    }}
+                    className="accent-sky-600" />
+                  <span className="text-sm">{t}</span>
+                </label>
+              ))}
+            </div>
+            {att.type === "法人" && (
+              <div className="space-y-1">
+                <Label className="text-xs">会社名<span className="text-red-500 ml-1">*</span></Label>
+                <MemoryInput memoryKey="drone_company" placeholder="会社名を入力"
+                  value={att.company}
+                  onChange={(v) => {
+                    const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, company: v } : a);
+                    onChange(index, { ...record, attendees: updated });
+                  }}
+                  className="h-9 text-sm" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="text-xs">受講者名<span className="text-red-500 ml-1">*</span></Label>
+              <MemoryInput memoryKey="drone_attendee_name" placeholder="氏名を入力"
+                value={att.name}
+                onChange={(v) => {
+                  const updated = (record.attendees ?? []).map((a, i) => i === ai ? { ...a, name: v } : a);
+                  onChange(index, { ...record, attendees: updated });
+                }}
+                className="h-9 text-sm" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold text-sky-700">売上金額（円）</Label>
+        <div className="flex items-center gap-1">
+          <Input type="text" inputMode="numeric" placeholder="0"
+            value={record.salesAmount ? Number(record.salesAmount.replace(/,/g, "")).toLocaleString() : ""}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/,/g, "");
+              if (/^\d*$/.test(raw)) onChange(index, { ...record, salesAmount: raw });
+            }}
+            className="h-9 text-sm w-40 font-mono" />
+          <span className="text-sm text-muted-foreground shrink-0">円</span>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">結果・成果</Label>
+        <MemoryInput memoryKey="training_result" placeholder="例：合格、修了証取得"
+          value={record.result}
+          onChange={(v) => onChange(index, { ...record, result: v })}
+          className="h-9 text-sm" />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">問題点・特記事項（任意）</Label>
+        <textarea placeholder="この講習の問題点や特記事項があれば記入"
+          value={record.note}
+          onChange={(e) => onChange(index, { ...record, note: e.target.value })}
+          rows={2}
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
+      </div>
+    </div>
+  );
+}
+
 export default function ReportNew() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
@@ -535,6 +941,8 @@ export default function ReportNew() {
   const [maintenanceMemo, setMaintenanceMemo] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [breakIsActive, setBreakIsActive] = useState(false);
+  const [slitterRecords, setSlitterRecords] = useState<SlitterRecord[]>([defaultSlitter()]);
+  const [droneRecords, setDroneRecords] = useState<DroneRecord[]>([defaultDrone()]);
   const draftStorageKey = user?.id ? `reportNewDraft:${user.id}` : null;
 
   const monthStart = useMemo(() => {
@@ -553,6 +961,24 @@ export default function ReportNew() {
     trpc.maintenance.getLastReport.useQuery(undefined, {
       enabled: formData.department === "maintenance" || isMaintenanceFlow,
     });
+
+  const hasDrone = workBlocks.some((b) => b.department === "drone");
+  const hasSlitter = workBlocks.some((b) => b.department === "slitter");
+
+  const { data: monthlySummary } = trpc.reports.getMonthlySummary.useQuery(
+    { workDate: formData.workDate },
+    { enabled: hasDrone }
+  );
+  const { data: monthlySlitterSummary } = trpc.reports.getMonthlySlitterSummary.useQuery(
+    { workDate: formData.workDate },
+    { enabled: hasSlitter }
+  );
+
+  const slitterTotalM = slitterRecords.reduce((sum, r) => sum + (parseFloat(r.totalM) || 0), 0);
+  const droneTotalCount = droneRecords.reduce((sum, r) => sum + (r.attendees?.length || 0), 0);
+  const droneTotalSales = droneRecords.reduce(
+    (sum, r) => sum + (parseInt(r.salesAmount?.replace(/,/g, "") || "0") || 0), 0
+  );
 
   const thisMonthMaintenanceCount = useMemo(
     () => (thisMonthReports ?? []).filter((r) => r.report.department === "maintenance").length,
@@ -693,6 +1119,18 @@ export default function ReportNew() {
   const removeVehicle = (index: number) => {
     setMaintenanceVehicles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const updateSlitterRecord = (index: number, updated: SlitterRecord) =>
+    setSlitterRecords((prev) => prev.map((r, i) => (i === index ? updated : r)));
+  const addSlitterRecord = () => setSlitterRecords((prev) => [...prev, defaultSlitter()]);
+  const removeSlitterRecord = (index: number) =>
+    setSlitterRecords((prev) => prev.filter((_, i) => i !== index));
+
+  const updateDroneRecord = (index: number, updated: DroneRecord) =>
+    setDroneRecords((prev) => prev.map((r, i) => (i === index ? updated : r)));
+  const addDroneRecord = () => setDroneRecords((prev) => [...prev, defaultDrone()]);
+  const removeDroneRecord = (index: number) =>
+    setDroneRecords((prev) => prev.filter((_, i) => i !== index));
 
   const updateVehicleDetail = (
     vehicleIndex: number,
@@ -1265,6 +1703,41 @@ export default function ReportNew() {
       sharedInfo: formData.sharedInfo || null,
       orderInfo: composedOrderInfo || formData.orderInfo || null,
       tasks: [...baseTasks, ...maintenanceTasks],
+      vehicleCount: hasSlitter
+        ? slitterRecords.filter((v) => v.rawW || v.procW).length
+        : hasDrone
+        ? droneRecords.filter((v) => v.trainingType).length
+        : undefined,
+      slitterDetails: hasSlitter
+        ? slitterRecords.filter((v) => v.rawW || v.procW).map((v) => ({
+            clientName: v.clientName || undefined,
+            rawW: v.rawW || undefined,
+            rawL: v.rawL || undefined,
+            rawLen: v.rawLen || undefined,
+            procW: v.procW || undefined,
+            procL: v.procL || undefined,
+            procLen: v.procLen || undefined,
+            honsu: v.honsu || undefined,
+            choTori: v.choTori || undefined,
+            speed: v.speed || undefined,
+            totalM: v.totalM ? parseFloat(v.totalM) : undefined,
+            processTime: v.processTime ? parseFloat(v.processTime) : undefined,
+            startTime: v.startTime || undefined,
+            endTime: v.endTime || undefined,
+            note: v.note || undefined,
+          }))
+        : undefined,
+      droneDetails: hasDrone
+        ? droneRecords.filter((v) => v.trainingType).map((v) => ({
+            trainingType: v.trainingType,
+            trainingName: v.trainingName || undefined,
+            count: v.attendees?.length || undefined,
+            salesAmount: parseInt(v.salesAmount?.replace(/,/g, "") || "0") || undefined,
+            result: v.result || undefined,
+            note: v.note || undefined,
+            attendees: v.attendees?.length > 0 ? v.attendees : undefined,
+          }))
+        : undefined,
     });
   };
 
@@ -1407,6 +1880,75 @@ export default function ReportNew() {
               </div>
             </div>
           )}
+          {hasDrone && (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground font-medium mb-2">実績サマリー（自動集計）</p>
+              <div className="grid grid-cols-2 gap-3 flex-wrap">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-sky-600">{droneTotalCount}</p>
+                  <p className="text-xs text-muted-foreground">本日の実績（人数）</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-sky-400">
+                    {(monthlySummary?.totalCount ?? 0) + droneTotalCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">今月の実績累計（人数）</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {droneTotalSales.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">本日の売上（円）</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-indigo-400">
+                    {((monthlySummary?.totalSales ?? 0) + droneTotalSales).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">今月の売上累計（円）</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {hasSlitter && (
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground font-medium mb-2">実績サマリー（自動集計）</p>
+              <div className="grid grid-cols-2 gap-3 flex-wrap">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-600">{slitterTotalM.toFixed(1)}</p>
+                  <p className="text-xs text-muted-foreground">本日の裁断m合計</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-400">
+                    {((monthlySlitterSummary?.monthlyTotalM ?? 0) + slitterTotalM).toFixed(1)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">今月の裁断m（本日含む）</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-orange-600">
+                    {slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0).toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">本日の加工時間</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-orange-400">
+                    {((monthlySlitterSummary?.monthlyProcessTime ?? 0) +
+                      slitterRecords.reduce((s, r) => s + (parseFloat(r.processTime) || 0), 0)).toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">今月の加工時間（本日含む）</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-yellow-600">{slitterRecords.length}</p>
+                  <p className="text-xs text-muted-foreground">本日の案件数</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {(monthlySlitterSummary?.monthlyCaseCount ?? 0) + slitterRecords.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">今月の案件数（本日含む）</p>
+                </div>
+              </div>
+            </div>
+          )}
           {formData.department !== "maintenance" && !isMaintenanceFlow && (
             <div>
               <Label htmlFor="sharedInfo">共有事項</Label>
@@ -1462,11 +2004,23 @@ export default function ReportNew() {
                   </Button>
                 )}
               </div>
-              {block.department !== "maintenance" && (
+              {block.department === "maintenance" && (
+                <p className="text-xs text-muted-foreground">
+                  ※ 整備内容は「車両別整備記録」に入力してください
+                </p>
+              )}
+              {block.department === "drone" && (
+                <p className="text-xs text-sky-700 font-medium">
+                  ※ 講習内容は「講習別記録」カードに入力してください
+                </p>
+              )}
+              {block.department === "slitter" && (
+                <p className="text-xs text-amber-700 font-medium">
+                  ※ 裁断内容は「案件別裁断記録」カードに入力してください
+                </p>
+              )}
+              {block.department !== "maintenance" && block.department !== "drone" && block.department !== "slitter" && (
                 <div className="space-y-1">
-                  {i > 0 && (
-                    <p className="text-xs text-sky-800 font-medium">（仮）このフォームは現在設定中です</p>
-                  )}
                   <textarea
                     value={block.content}
                     onChange={(e) => updateWorkBlock(i, "content", e.target.value)}
@@ -1476,15 +2030,61 @@ export default function ReportNew() {
                   />
                 </div>
               )}
-              {block.department === "maintenance" && (
-                <p className="text-xs text-muted-foreground">
-                  ※ 整備内容は「車両別整備記録」に入力してください
-                </p>
-              )}
             </div>
           ))}
         </CardContent>
       </Card>
+
+      {/* ドローン講習別記録 */}
+      {hasDrone && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">🚁 講習別記録</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-sky-50 border-2 border-sky-200">
+              <span className="text-xs text-sky-600 font-medium">本日の実績</span>
+              <span className="text-2xl font-bold text-sky-700">{droneRecords.length}</span>
+              <span className="text-xs text-sky-500">件</span>
+              {droneTotalCount > 0 && (
+                <>
+                  <span className="text-xs text-sky-400 mx-1">|</span>
+                  <span className="text-xs text-sky-600 font-medium">受講者合計</span>
+                  <span className="text-2xl font-bold text-sky-700">{droneTotalCount}</span>
+                  <span className="text-xs text-sky-500">人</span>
+                </>
+              )}
+            </div>
+            {droneRecords.map((record, i) => (
+              <DroneRecordBlock
+                key={i} record={record} index={i} total={droneRecords.length}
+                onChange={updateDroneRecord} onRemove={removeDroneRecord} />
+            ))}
+            <Button variant="outline" size="sm" onClick={addDroneRecord} className="w-full h-9 gap-1">
+              <Plus className="w-3.5 h-3.5" />講習を追加
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* スリッター案件別裁断記録 */}
+      {hasSlitter && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">✂️ 案件別裁断記録</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {slitterRecords.map((record, i) => (
+              <SlitterRecordBlock
+                key={i} record={record} index={i} total={slitterRecords.length}
+                onChange={updateSlitterRecord} onRemove={removeSlitterRecord} />
+            ))}
+            <Button variant="outline" size="sm" onClick={addSlitterRecord} className="w-full h-9 gap-1">
+              <Plus className="w-3.5 h-3.5" />案件を追加
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {isMaintenance ? (
         <>
