@@ -9,6 +9,7 @@ import cors from "cors";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers";
 import { createContext } from "./lib/trpc";
+import calendarAuthRouter from "./routes/calendarAuth";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "3000");
@@ -23,6 +24,10 @@ app.use(
     credentials: true,
   })
 );
+
+// ─── OAuth カレンダー連携（Express ルート）──────────────────────────────────
+
+app.use("/api/auth", calendarAuthRouter);
 
 // ─── tRPC ─────────────────────────────────────────────────────────────────────
 

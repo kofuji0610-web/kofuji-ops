@@ -4,6 +4,7 @@ import {
   serial,
   varchar,
   int,
+  bigint,
   float,
   timestamp,
   date,
@@ -11,6 +12,9 @@ import {
   boolean,
   json,
   index,
+  decimal,
+  datetime,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
@@ -24,8 +28,7 @@ export const users = mysqlTable("users", {
   name: varchar("name", { length: 100 }).notNull(),
   displayName: varchar("display_name", { length: 100 }),
   email: varchar("email", { length: 255 }),
-  role: varchar("role", { length: 20 }).notNull().default("user"),
-  // role: "user" | "manager" | "admin"
+  role: mysqlEnum("role", ["user", "manager", "leader", "admin"]).notNull().default("user"),
   department: varchar("department", { length: 50 }),
   // department: "maintenance" | "painting" | "slitter" | "drone" | "admin"
   isActive: boolean("is_active").notNull().default(true),
@@ -43,7 +46,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const sessions = mysqlTable("sessions", {
   id: varchar("id", { length: 255 }).primaryKey(),
-  userId: int("user_id").notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -62,7 +65,7 @@ export const attendances = mysqlTable(
   "attendances",
   {
     id: serial("id").primaryKey(),
-    userId: int("user_id").notNull(),
+    userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
     workDate: date("work_date").notNull(), // "YYYY-MM-DD"
     attendanceType: varchar("attendance_type", { length: 20 }).notNull().default("normal"),
     // attendanceType: "normal" | "paid_leave" | "absence" | "late" | "early_leave"
@@ -89,7 +92,7 @@ export const attendancesRelations = relations(attendances, ({ one }) => ({
 
 export const reports = mysqlTable("reports", {
   id: serial("id").primaryKey(),
-  userId: int("user_id").notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   workDate: date("work_date").notNull(),
   department: varchar("department", { length: 50 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
@@ -133,26 +136,142 @@ export const reportTasksRelations = relations(reportTasks, ({ one }) => ({
 
 export const schedules = mysqlTable("schedules", {
   id: serial("id").primaryKey(),
-  userId: int("user_id").notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   startAt: timestamp("start_at").notNull(),
   endAt: timestamp("end_at").notNull(),
   allDay: boolean("all_day").notNull().default(false),
   color: varchar("color", { length: 20 }),
+  scheduleType: mysqlEnum("schedule_type", ["department", "personal", "vehicle", "equipment"])
+    .notNull()
+    .default("department"),
+  scheduleDepartment: mysqlEnum("department", ["maintenance", "painting", "slitter", "drone", "all", "personal"])
+    .notNull()
+    .default("all"),
+  resourceName: varchar("resource_name", { length: 255 }),
+  createdBy: int("created_by").notNull().default(0),
+  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
 
-export const schedulesRelations = relations(schedules, ({ one }) => ({
-  user: one(users, { fields: [schedules.userId], references: [users.id] }),
+export const scheduleTasks = mysqlTable("schedule_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleId: bigint("schedule_id", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  completed: boolean("completed").notNull().default(false),
+  sortOrder: int("sort_order").notNull().default(0),
+});
+
+export const scheduleTasksRelations = relations(scheduleTasks, ({ one }) => ({
+  schedule: one(schedules, { fields: [scheduleTasks.scheduleId], references: [schedules.id] }),
 }));
+
+export const schedulesRelations = relations(schedules, ({ one, many }) => ({
+  user: one(users, { fields: [schedules.userId], references: [users.id] }),
+  tasks: many(scheduleTasks),
+}));
+
+export const workHours = mysqlTable(
+  "work_hours",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    workDate: date("work_date").notNull(),
+    hours: decimal("hours", { precision: 4, scale: 2 }).notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => ({
+    userDateUq: uniqueIndex("work_hours_user_date_uq").on(t.userId, t.workDate),
+  })
+);
+
+export const shifts = mysqlTable(
+  "shifts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    shiftDate: date("shift_date").notNull(),
+    shiftType: mysqlEnum("shift_type", ["work", "off", "remote", "leave"]).notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => ({
+    userShiftDateUq: uniqueIndex("shifts_user_date_uq").on(t.userId, t.shiftDate),
+  })
+);
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => users.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  category: mysqlEnum("category", ["schedule", "shift", "system"]).notNull(),
+  relatedId: int("related_id"),
+  readAt: datetime("read_at", { mode: "string" }),
+  notifyAt: datetime("notify_at", { mode: "string" }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const notificationSettings = mysqlTable(
+  "notification_settings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+    reminderMinutes: int("reminder_minutes"),
+    pushEnabled: boolean("push_enabled").notNull().default(true),
+    emailEnabled: boolean("email_enabled").notNull().default(false),
+    slackWebhookUrl: varchar("slack_webhook_url", { length: 512 }),
+    pushSubscription: text("push_subscription"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => ({
+    userUq: uniqueIndex("notification_settings_user_uq").on(t.userId),
+  })
+);
+
+export const calendarIntegrations = mysqlTable(
+  "calendar_integrations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    provider: mysqlEnum("provider", ["google", "outlook"]).notNull(),
+    externalCalendarId: varchar("external_calendar_id", { length: 255 }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    tokenExpiresAt: datetime("token_expires_at", { mode: "string" }),
+    syncEnabled: boolean("sync_enabled").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => ({
+    userProviderUq: uniqueIndex("calendar_integrations_user_provider_uq").on(t.userId, t.provider),
+  })
+);
 
 // ─── Maintenance Records ──────────────────────────────────────────────────────
 
 export const maintenanceRecords = mysqlTable("maintenance_records", {
   id: serial("id").primaryKey(),
-  userId: int("user_id").notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   vehicleNumber: varchar("vehicle_number", { length: 50 }).notNull(),
   workDate: date("work_date").notNull(),
   workType: varchar("work_type", { length: 50 }),
@@ -266,7 +385,7 @@ export const maintenanceParts = mysqlTable("maintenance_parts", {
 
 export const purchaseRequests = mysqlTable("purchase_requests", {
   id: serial("id").primaryKey(),
-  userId: int("user_id").notNull(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   amount: int("amount"),
@@ -290,6 +409,18 @@ export type ReportTask = typeof reportTasks.$inferSelect;
 export type NewReportTask = typeof reportTasks.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
 export type NewSchedule = typeof schedules.$inferInsert;
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+export type NewScheduleTask = typeof scheduleTasks.$inferInsert;
+export type WorkHour = typeof workHours.$inferSelect;
+export type NewWorkHour = typeof workHours.$inferInsert;
+export type Shift = typeof shifts.$inferSelect;
+export type NewShift = typeof shifts.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+export type NotificationSetting = typeof notificationSettings.$inferSelect;
+export type NewNotificationSetting = typeof notificationSettings.$inferInsert;
+export type CalendarIntegration = typeof calendarIntegrations.$inferSelect;
+export type NewCalendarIntegration = typeof calendarIntegrations.$inferInsert;
 export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
 export type MaintenanceReport = typeof maintenanceReports.$inferSelect;
 export type NewMaintenanceReport = typeof maintenanceReports.$inferInsert;

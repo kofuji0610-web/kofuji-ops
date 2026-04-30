@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure } from "../lib/trpc";
 import { db } from "../db";
@@ -12,6 +12,20 @@ export const usersRouter = router({
     return db.select().from(users).orderBy(users.id);
   }),
 
+  /** スケジュール画面用: id / name / displayName / department / role（ログインユーザー全員が参照可） */
+  listForSchedule: protectedProcedure.query(async () => {
+    return db
+      .select({
+        id: users.id,
+        name: users.name,
+        displayName: users.displayName,
+        department: users.department,
+        role: users.role,
+      })
+      .from(users)
+      .orderBy(asc(users.id));
+  }),
+
   // ─── ユーザーを作成（管理者のみ） ────────────────────────────────────────────
   create: adminProcedure
     .input(
@@ -21,7 +35,7 @@ export const usersRouter = router({
         name: z.string().min(1).max(100),
         displayName: z.string().optional().nullable(),
         email: z.string().email().optional().nullable(),
-        role: z.enum(["user", "manager", "admin"]).default("user"),
+        role: z.enum(["user", "manager", "leader", "admin"]).default("user"),
         department: z
           .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
           .optional()
@@ -58,7 +72,7 @@ export const usersRouter = router({
         name: z.string().optional(),
         displayName: z.string().optional().nullable(),
         email: z.string().email().optional().nullable(),
-        role: z.enum(["user", "manager", "admin"]).optional(),
+        role: z.enum(["user", "manager", "leader", "admin"]).optional(),
         department: z
           .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
           .optional()

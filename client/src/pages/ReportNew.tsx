@@ -1609,6 +1609,7 @@ export default function ReportNew() {
           department: "maintenance",
           start: report.workStartTime ?? "08:00",
           end: report.workEndTime ?? "17:00",
+          content: "",
         },
       ]);
       setMaintenanceMemo(report.notes ?? "");
@@ -1712,7 +1713,7 @@ export default function ReportNew() {
     vehicleIndex: number,
     detailIndex: number,
     field: keyof MaintenanceDetailForm,
-    value: string | boolean | string[] | Record<string, string>
+    value: unknown
   ) => {
     setMaintenanceVehicles((prev) =>
       prev.map((v, i) =>

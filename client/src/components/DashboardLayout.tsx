@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   Home,
@@ -15,11 +15,13 @@ import {
   Menu,
   X,
   ChevronDown,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { trpc } from "../lib/trpc";
 
 // ─── ナビゲーション定義 ───────────────────────────────────────────────────────
 
@@ -66,6 +68,32 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: true });
   const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const isSchedulePage = location === "/schedule";
+
+  const utils = trpc.useUtils();
+  const { data: unreadNotifications = [] } = trpc.notifications.unread.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+
+  const markReadMutation = trpc.notifications.markRead.useMutation({
+    onSuccess: () => {
+      void utils.notifications.unread.invalidate();
+    },
+  });
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const close = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showNotifications]);
 
   if (loading) {
     return (
@@ -102,6 +130,49 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     navigate(item.path);
     if (mobile) setIsMobileOpen(false);
   };
+
+  const NotificationBell = ({ className }: { className?: string }) => (
+    <div className={cn("relative", className)} ref={notifRef}>
+      <button
+        type="button"
+        onClick={() => setShowNotifications((prev) => !prev)}
+        className="relative p-2 rounded-md hover:bg-accent"
+        aria-label="通知"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadNotifications.length > 0 && (
+          <span className="absolute top-1 right-1 h-4 min-w-[1rem] px-0.5 rounded-full bg-red-500 text-white text-[10px] leading-4 flex items-center justify-center">
+            {unreadNotifications.length > 9 ? "9+" : unreadNotifications.length}
+          </span>
+        )}
+      </button>
+      {showNotifications && (
+        <div className="absolute right-0 top-full mt-1 z-[100] w-80 max-h-72 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+          {unreadNotifications.length === 0 ? (
+            <p className="p-3 text-sm text-muted-foreground">未読はありません</p>
+          ) : (
+            <ul className="py-1">
+              {unreadNotifications.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                    onClick={() => {
+                      markReadMutation.mutate({ id: n.id });
+                      setShowNotifications(false);
+                    }}
+                  >
+                    <span className="font-medium line-clamp-2">{n.title}</span>
+                    {n.body && <span className="block text-xs text-muted-foreground line-clamp-2">{n.body}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div
@@ -211,23 +282,34 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* メインコンテンツ */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <header className="hidden md:flex items-center justify-end gap-2 px-4 py-2 border-b bg-background shrink-0">
+          <NotificationBell />
+        </header>
+
         {/* モバイルヘッダー */}
         <header className="md:hidden flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsMobileOpen(true)}
+            onClick={() => setIsMobileOpen((v) => !v)}
             className="h-8 w-8"
           >
             {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
-          <p className="text-sm font-semibold">コフジ物流株式会社</p>
+          <p className="text-sm font-semibold flex-1">コフジ物流株式会社</p>
+          <NotificationBell />
         </header>
 
         {/* ページコンテンツ */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 py-5">{children}</div>
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {isSchedulePage ? (
+            <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-auto">
+              <div className="p-4 md:p-6 max-w-5xl mx-auto">{children}</div>
+            </div>
+          )}
         </main>
       </div>
     </div>

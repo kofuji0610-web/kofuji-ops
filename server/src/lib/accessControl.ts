@@ -1,4 +1,5 @@
 import type { User } from "../db/schema";
+import { canEditScheduleOf } from "../utils/schedulePermission";
 
 /**
  * 閲覧者が「対象ユーザー（role）」の情報を読めるか。
@@ -8,15 +9,19 @@ export function canReadUserWithRole(viewerRole: string, targetRole: string | nul
   if (!targetRole) return false;
   if (viewerRole === "admin") return true;
   if (viewerRole === "manager") return targetRole === "user" || targetRole === "manager";
+  if (viewerRole === "leader") return targetRole === "user";
   if (viewerRole === "user") return targetRole === "user";
   return false;
 }
 
-/** Drizzle の inArray 等に渡す、閲覧可能な role 一覧 */
-export function readableRolesForViewer(viewerRole: string): string[] {
-  if (viewerRole === "admin") return ["user", "manager", "admin"];
+/** Drizzle の inArray 等に渡す、閲覧可能な role 一覧（日報・勤怠など既存の閲覧範囲。leader は Phase 2 で個別調整可） */
+export function readableRolesForViewer(
+  viewerRole: string
+): ("user" | "manager" | "leader" | "admin")[] {
+  if (viewerRole === "admin") return ["user", "manager", "leader", "admin"];
   if (viewerRole === "manager") return ["user", "manager"];
   if (viewerRole === "user") return ["user"];
+  if (viewerRole === "leader") return ["user"];
   return [];
 }
 
@@ -54,7 +59,5 @@ export function canManualUpdateAttendance(viewer: User, ownerUserId: number, own
 export function canMutateSchedule(viewer: User, scheduleOwnerUserId: number, scheduleOwnerRole: string | null | undefined): boolean {
   if (!scheduleOwnerRole) return false;
   if (viewer.id === scheduleOwnerUserId) return true;
-  if (viewer.role === "admin") return true;
-  if (viewer.role === "manager") return scheduleOwnerRole === "user";
-  return false;
+  return canEditScheduleOf(viewer.role, scheduleOwnerRole);
 }

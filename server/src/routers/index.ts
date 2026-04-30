@@ -6,6 +6,10 @@ import { usersRouter } from "./users";
 import { schedulesRouter } from "./schedules";
 import { maintenanceRouter } from "./maintenance";
 import { droneSalesRouter } from "./droneSales";
+import { shiftsRouter } from "./shifts";
+import { workHoursRouter } from "./workHours";
+import { notificationsRouter } from "./notifications";
+import { calendarRouter } from "./calendar";
 
 export const appRouter = router({
   auth: authRouter,
@@ -16,6 +20,10 @@ export const appRouter = router({
   schedules: schedulesRouter,
   maintenance: maintenanceRouter,
   droneSales: droneSalesRouter,
+  shifts: shiftsRouter,
+  workHours: workHoursRouter,
+  notifications: notificationsRouter,
+  calendar: calendarRouter,
 });
 
 export type AppRouter = typeof appRouter;
