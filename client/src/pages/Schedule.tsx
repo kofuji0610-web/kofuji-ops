@@ -81,6 +81,58 @@ const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 /** 週次工数表ヘッダー（月〜日 = ISO 週の月曜始まり） */
 const WEEKDAY_HEADERS_MO_SU = ["月", "火", "水", "木", "金", "土", "日"];
 const LABEL_W = 160;
+const CALENDAR_PREFS_KEY = "schedule-calendar-prefs-v1";
+
+type CalendarPrefs = {
+  view?: "month" | "week" | "timeline";
+  tlMode?: "month" | "week" | "day";
+  density?: "comfortable" | "compact";
+  activeDepts?: string[];
+  selectedMemberIds?: number[];
+};
+
+function loadCalendarPrefs(): CalendarPrefs {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(CALENDAR_PREFS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as CalendarPrefs;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function formatHm(d: Date): string {
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function formatEventTimeLabel(ev: ScheduleRow): string {
+  if (ev.allDay) return "終日";
+  return `${formatHm(ev.startAt)}-${formatHm(ev.endAt)}`;
+}
+
+function getDeptChipClass(dept: string | null | undefined): string {
+  const dk = (dept ?? "all") as keyof typeof DEPT_CONFIG;
+  if (dk === "maintenance") return "bg-blue-100 text-blue-900 border-blue-200";
+  if (dk === "painting") return "bg-green-100 text-green-900 border-green-200";
+  if (dk === "slitter") return "bg-amber-100 text-amber-900 border-amber-200";
+  if (dk === "drone") return "bg-violet-100 text-violet-900 border-violet-200";
+  if (dk === "personal") return "bg-pink-100 text-pink-900 border-pink-200";
+  return "bg-slate-100 text-slate-900 border-slate-200";
+}
+
+function getDeptAccentClass(dept: string | null | undefined): string {
+  const dk = (dept ?? "all") as keyof typeof DEPT_CONFIG;
+  if (dk === "maintenance") return "border-l-blue-400";
+  if (dk === "painting") return "border-l-green-400";
+  if (dk === "slitter") return "border-l-amber-400";
+  if (dk === "drone") return "border-l-violet-400";
+  if (dk === "personal") return "border-l-pink-400";
+  return "border-l-slate-400";
+}
 
 function canDeleteSchedule(
   viewerId: number,
@@ -137,12 +189,20 @@ function isHolidayOrSunday(d: Date): boolean {
   return holidayJp.isHoliday(d);
 }
 
+function getHolidayName(d: Date): string | null {
+  const holiday = holidayJp.isHoliday(d) as unknown;
+  if (!holiday || typeof holiday !== "object") return null;
+  if (!("name" in holiday)) return null;
+  const name = (holiday as { name?: unknown }).name;
+  return typeof name === "string" ? name : null;
+}
+
 function isSaturday(d: Date): boolean {
   return d.getDay() === 6;
 }
 
 function parseDropToAnchor(dropId: string): { ymd: string; hour: number | null } | null {
-  const mDay = dropId.match(/^(?:day|week)-(\d{4}-\d{2}-\d{2})$/);
+  const mDay = dropId.match(/^(?:day|week)-(\d{4}-\d{2}-\d{2})(?:-\d+)?$/);
   if (mDay) return { ymd: mDay[1], hour: null };
   const mTl = dropId.match(/^tl-(?:month|week)-[a-z]+-(\d{4}-\d{2}-\d{2})$/);
   if (mTl) return { ymd: mTl[1], hour: null };
@@ -851,10 +911,12 @@ function NotificationTab() {
 function DraggableEventChip({
   id,
   children,
+  dense = false,
   className,
 }: {
   id: string;
   children: React.ReactNode;
+  dense?: boolean;
   className?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
@@ -871,7 +933,8 @@ function DraggableEventChip({
       role="button"
       tabIndex={0}
       className={cn(
-        "flex items-center gap-0.5 max-w-full rounded border px-1 py-0.5 text-left text-[10px] leading-tight shadow-sm",
+        "flex items-center gap-0.5 max-w-full rounded border px-1 text-left leading-tight shadow-sm",
+        dense ? "py-0 text-[10px]" : "py-0.5 text-[11px]",
         isDragging && "opacity-40",
         className
       )}
@@ -882,10 +945,20 @@ function DraggableEventChip({
   );
 }
 
-function DroppableCell({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+function DroppableCell({
+  id,
+  children,
+  className,
+  onContextMenu,
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+  onContextMenu?: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={cn(className, isOver && "ring-2 ring-primary ring-inset")}>
+    <div ref={setNodeRef} onContextMenu={onContextMenu} className={cn(className, isOver && "ring-2 ring-primary ring-inset")}>
       {children}
     </div>
   );
@@ -896,16 +969,26 @@ function DroppableCell({ id, children, className }: { id: string; children: Reac
 function CalendarTab() {
   const { user } = useAuth();
   const utils = trpc.useUtils();
+  const [initialPrefs] = useState<CalendarPrefs>(() => loadCalendarPrefs());
 
   const [view, setView] = useState<"month" | "week" | "timeline">("month");
-  const [tlMode, setTlMode] = useState<"month" | "week" | "day">("month");
+  const [tlMode, setTlMode] = useState<"month" | "week" | "day">(initialPrefs.tlMode ?? "month");
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [activeDepts, setActiveDepts] = useState<Set<string>>(
-    () => new Set(["maintenance", "painting", "slitter", "drone", "all", "personal"])
+    () =>
+      new Set(
+        initialPrefs.activeDepts?.length
+          ? initialPrefs.activeDepts
+          : ["maintenance", "painting", "slitter", "drone", "all", "personal"]
+      )
   );
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<number>>(new Set());
-  const [showMemberPanel, setShowMemberPanel] = useState(false);
+  const [density, setDensity] = useState<"comfortable" | "compact">(initialPrefs.density ?? "comfortable");
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<number>>(
+    () => new Set(initialPrefs.selectedMemberIds ?? [])
+  );
+  const [sidebarFilterMode, setSidebarFilterMode] = useState<"department" | "member">("department");
+  const [memberQuery, setMemberQuery] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<ScheduleRow | null>(null);
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -923,6 +1006,8 @@ function CalendarTab() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const isDraggingRef = useRef(false);
   const [dragEvent, setDragEvent] = useState<ScheduleRow | null>(null);
+  const [dayListYmd, setDayListYmd] = useState<string | null>(null);
+  const [selectedYmd, setSelectedYmd] = useState<string>(() => formatYmd(new Date()));
 
   const rangeInput = useMemo(() => {
     const y = currentDate.getFullYear();
@@ -1059,7 +1144,7 @@ function CalendarTab() {
         const ds = formatYmd(s.startAt);
         const de = formatYmd(s.endAt);
         return ds <= ymd && ymd <= de;
-      }),
+      }).sort((a, b) => a.startAt.getTime() - b.startAt.getTime()),
     [filteredSchedules]
   );
 
@@ -1125,6 +1210,37 @@ function CalendarTab() {
     setShowForm(true);
   };
 
+  const openDuplicateFromEvent = (ev: ScheduleRow) => {
+    setFormData({
+      title: `${ev.title}（複製）`,
+      description: ev.description ?? "",
+      scheduleType: (ev.scheduleType === "personal" ? "personal" : "department") as "department" | "personal",
+      department: ev.scheduleDepartment ?? "all",
+      startAt: toDatetimeLocal(ev.startAt),
+      endAt: toDatetimeLocal(ev.endAt),
+      allDay: ev.allDay,
+      color: ev.color ?? "#3B82F6",
+    });
+    setShowForm(true);
+  };
+
+  const addTasksFromInput = async () => {
+    if (!selectedEvent) return;
+    const lines = newTaskTitle
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!lines.length) return;
+    try {
+      await Promise.all(lines.map((title) => addTaskMutation.mutateAsync({ scheduleId: selectedEvent.id, title })));
+      setNewTaskTitle("");
+      void refetchTasks();
+      toast.success(`${lines.length}件のタスクを追加しました`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "タスクの追加に失敗しました");
+    }
+  };
+
   const navPrev = () => {
     if (view === "month") {
       setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()));
@@ -1166,6 +1282,14 @@ function CalendarTab() {
     });
   };
 
+  const activateAllDepts = () => {
+    setActiveDepts(new Set(DEPT_KEYS));
+  };
+
+  const clearAllDepts = () => {
+    setActiveDepts(new Set());
+  };
+
   const toggleCollapsed = (key: string) => {
     setCollapsedDepts((prev) => {
       const n = new Set(prev);
@@ -1175,36 +1299,90 @@ function CalendarTab() {
     });
   };
 
-  const titleBar =
+  const periodLabel =
     view === "month"
-      ? `${y}年 ${mo + 1}月`
+      ? `${y}年${mo + 1}月`
       : view === "week"
-        ? `週: ${formatYmd(weekDays[0])} 〜 ${formatYmd(weekDays[6])}`
+        ? `${format(weekDays[0], "yyyy年M月d日")} - ${format(weekDays[6], "M月d日")}`
         : tlMode === "month"
-          ? `TL 月: ${y}年 ${mo + 1}月`
+          ? `${y}年${mo + 1}月`
           : tlMode === "week"
-            ? `TL 週: ${formatYmd(weekDays[0])} 〜`
-            : `TL 日: ${formatYmd(currentDate)}`;
+            ? `${format(weekDays[0], "yyyy年M月d日")} - ${format(weekDays[6], "M月d日")}`
+            : `${format(currentDate, "yyyy年M月d日")}`;
+
+  useEffect(() => {
+    // 初期表示を必ず月ビューに固定
+    setView("month");
+  }, []);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => {
+      const name = (m.displayName ?? m.name ?? "").toLowerCase();
+      return name.includes(q);
+    });
+  }, [members, memberQuery]);
+
+  const dayListEvents = useMemo(() => {
+    if (!dayListYmd) return [];
+    return eventsForDay(dayListYmd);
+  }, [dayListYmd, eventsForDay]);
+
+  const todayYmd = formatYmd(new Date());
+  const selectedDaySchedules = useMemo(
+    () => eventsForDay(selectedYmd).slice(0, 10),
+    [eventsForDay, selectedYmd]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const prefs: CalendarPrefs = {
+      view,
+      tlMode,
+      density,
+      activeDepts: [...activeDepts],
+      selectedMemberIds: [...selectedMemberIds],
+    };
+    window.localStorage.setItem(CALENDAR_PREFS_KEY, JSON.stringify(prefs));
+  }, [view, tlMode, density, activeDepts, selectedMemberIds]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2 p-2">
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1">
-          <Button type="button" variant="outline" size="icon" onClick={navPrev} aria-label="前">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="outline" size="icon" onClick={navNext} aria-label="次">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium px-2">{titleBar}</span>
+    <div className="flex flex-col h-full min-h-0 gap-2 p-3 bg-slate-100/70">
+      <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div className="min-w-[220px]">
+            <h2 className="text-base font-semibold tracking-wide">スケジュール</h2>
+            <p className="text-xs text-muted-foreground">メンバー・部署ごとの予定を一覧で確認できます</p>
+          </div>
+
+          <div className="text-center">
+            <p className="text-lg font-semibold tracking-wide text-slate-800">{periodLabel}</p>
+          </div>
+
+          <div className="flex items-center justify-start gap-1 lg:justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+              今日
+            </Button>
+            <Button type="button" variant="outline" size="icon" onClick={navPrev} aria-label="前">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="outline" size="icon" onClick={navNext} aria-label="次">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button type="button" size="sm" className="ml-1" onClick={() => setShowForm(true)}>
+              ＋ 新規予定
+            </Button>
+          </div>
         </div>
 
-        <div className="flex rounded-md border p-0.5 bg-muted/40">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
           <Button
             type="button"
             variant={view === "month" ? "secondary" : "ghost"}
             size="sm"
-            className="h-8"
+              className="h-8 rounded-md"
             onClick={() => setView("month")}
           >
             <LayoutGrid className="h-4 w-4 mr-1" />
@@ -1214,7 +1392,7 @@ function CalendarTab() {
             type="button"
             variant={view === "week" ? "secondary" : "ghost"}
             size="sm"
-            className="h-8"
+              className="h-8 rounded-md"
             onClick={() => setView("week")}
           >
             週
@@ -1223,7 +1401,7 @@ function CalendarTab() {
             type="button"
             variant={view === "timeline" ? "secondary" : "ghost"}
             size="sm"
-            className="h-8"
+              className="h-8 rounded-md"
             onClick={() => setView("timeline")}
           >
             <List className="h-4 w-4 mr-1" />
@@ -1232,7 +1410,7 @@ function CalendarTab() {
         </div>
 
         {view === "timeline" && (
-          <div className="flex gap-1">
+            <div className="flex gap-1">
             {(["month", "week", "day"] as const).map((m) => (
               <Button
                 key={m}
@@ -1247,108 +1425,245 @@ function CalendarTab() {
           </div>
         )}
 
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowMemberPanel((v) => !v)}>
-          <Users className="h-4 w-4 mr-1" />
-          メンバー
-        </Button>
-
-        <Button type="button" size="sm" onClick={() => setShowForm(true)}>
-          ＋ 予定
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-1 shrink-0">
-        {DEPT_KEYS.map((k) => (
-          <button
-            key={k}
+          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+          <Button
             type="button"
-            onClick={() => toggleDeptFilter(k)}
-            className={cn(
-              "text-xs px-2 py-0.5 rounded-full border",
-              activeDepts.has(k) ? DEPT_CONFIG[k].border + " " + DEPT_CONFIG[k].bg + " text-white" : "opacity-40 border-muted"
-            )}
+            variant={density === "comfortable" ? "secondary" : "ghost"}
+            size="sm"
+              className="h-8 rounded-md"
+            onClick={() => setDensity("comfortable")}
           >
-            {DEPT_CONFIG[k].label}
-          </button>
-        ))}
+            見やすく
+          </Button>
+          <Button
+            type="button"
+            variant={density === "compact" ? "secondary" : "ghost"}
+            size="sm"
+              className="h-8 rounded-md"
+            onClick={() => setDensity("compact")}
+          >
+            たくさん表示
+          </Button>
+        </div>
+        </div>
       </div>
 
-      {showMemberPanel && (
-        <Card className="shrink-0">
-          <CardHeader className="py-2 px-3">
-            <CardTitle className="text-sm">表示するメンバー（未選択で全員）</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 py-2 px-3">
-            {members.map((m) => (
-              <label key={m.id} className="flex items-center gap-1 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedMemberIds.has(m.id)}
-                  onChange={() =>
-                    setSelectedMemberIds((prev) => {
-                      const n = new Set(prev);
-                      if (n.has(m.id)) n.delete(m.id);
-                      else n.add(m.id);
-                      return n;
-                    })
-                  }
-                />
-                <span style={{ color: memberColor(m.id) }}>{m.displayName ?? m.name}</span>
-              </label>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground shrink-0">
+        <Badge variant="outline">表示予定: {filteredSchedules.length}件</Badge>
+        <Badge variant="outline">部署: {activeDepts.size}/{DEPT_KEYS.length}</Badge>
+        <Badge variant="outline">
+          メンバー: {selectedMemberIds.size === 0 ? "全員" : `${selectedMemberIds.size}名選択`}
+        </Badge>
+      </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex-1 min-h-0 overflow-auto border rounded-md bg-card">
-          {view === "month" && (
-            <MonthGridView
-              month={mo}
-              cells={monthGrid}
-              eventsForDay={eventsForDay}
-              onCellClick={openCreateForDay}
-              onEventClick={(ev, e) => {
-                if (isDraggingRef.current) return;
-                setSelectedEvent(ev);
-                setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                setShowEventPanel(true);
-              }}
-            />
-          )}
-          {view === "week" && (
-            <WeekGridView
-              weekDays={weekDays}
-              eventsForDay={eventsForDay}
-              onCellClick={openCreateForDay}
-              onEventClick={(ev, e) => {
-                if (isDraggingRef.current) return;
-                setSelectedEvent(ev);
-                setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                setShowEventPanel(true);
-              }}
-            />
-          )}
-          {view === "timeline" && (
-            <TimelineView
-              tlMode={tlMode}
-              currentDate={currentDate}
-              year={y}
-              month={mo}
-              weekDays={weekDays}
-              collapsedDepts={collapsedDepts}
-              toggleCollapsed={toggleCollapsed}
-              filteredSchedules={filteredSchedules}
-              eventsForDay={eventsForDay}
-              onCellClick={openCreateForDay}
-              onEventClick={(ev, e) => {
-                if (isDraggingRef.current) return;
-                setSelectedEvent(ev);
-                setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                setShowEventPanel(true);
-              }}
-            />
-          )}
+        <div className="grid flex-1 min-h-0 gap-2 grid-cols-[250px_minmax(0,1fr)_260px]">
+          <Card className="w-full min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm">
+            <CardHeader className="py-2 px-3 border-b">
+              <CardTitle className="text-sm flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                フィルター
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 py-2 px-3">
+              <MiniMonthPicker
+                currentDate={currentDate}
+                onPickDate={(d) => {
+                  setCurrentDate(d);
+                  setSelectedYmd(formatYmd(d));
+                }}
+                onPrevMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()))}
+                onNextMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()))}
+              />
+
+              <div className="flex rounded-md border p-0.5 bg-muted/20">
+                <Button
+                  type="button"
+                  variant={sidebarFilterMode === "department" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 flex-1"
+                  onClick={() => setSidebarFilterMode("department")}
+                >
+                  部署
+                </Button>
+                <Button
+                  type="button"
+                  variant={sidebarFilterMode === "member" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 flex-1"
+                  onClick={() => setSidebarFilterMode("member")}
+                >
+                  メンバー
+                </Button>
+              </div>
+
+              {sidebarFilterMode === "department" ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground">表示部署</p>
+                  <div className="flex gap-1">
+                    <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={activateAllDepts}>
+                      全
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={clearAllDepts}>
+                      解除
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {DEPT_KEYS.map((k) => (
+                    <label key={`side-${k}`} className="flex items-center gap-2 text-xs py-0.5">
+                      <input type="checkbox" checked={activeDepts.has(k)} onChange={() => toggleDeptFilter(k)} />
+                      <span className="truncate">{DEPT_CONFIG[k].label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              ) : (
+              <>
+              <p className="text-xs font-semibold text-muted-foreground">メンバー</p>
+              <Input
+                value={memberQuery}
+                onChange={(e) => setMemberQuery(e.target.value)}
+                placeholder="メンバー検索"
+                className="h-8"
+              />
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSelectedMemberIds(new Set(filteredMembers.map((m) => m.id)))}
+                >
+                  全選択
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="flex-1" onClick={() => setSelectedMemberIds(new Set())}>
+                  全解除
+                </Button>
+              </div>
+              <div className="max-h-[62vh] overflow-auto pr-1 space-y-1">
+                {filteredMembers.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedMemberIds.has(m.id)}
+                      onChange={() =>
+                        setSelectedMemberIds((prev) => {
+                          const n = new Set(prev);
+                          if (n.has(m.id)) n.delete(m.id);
+                          else n.add(m.id);
+                          return n;
+                        })
+                      }
+                    />
+                    <span style={{ color: memberColor(m.id) }} className="truncate">
+                      {m.displayName ?? m.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              </>
+              )}
+              <div className="h-px bg-border my-1" />
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium text-muted-foreground">凡例</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {DEPT_KEYS.map((k) => (
+                    <div key={`legend-${k}`} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <span className={cn("inline-block h-2.5 w-2.5 rounded-sm border", getDeptChipClass(k))} />
+                      <span className="truncate">{DEPT_CONFIG[k].label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="min-w-0 min-h-0 overflow-auto rounded-lg border border-slate-200/80 bg-white shadow-sm">
+            {view === "month" && (
+              <MonthGridView
+                month={mo}
+                cells={monthGrid}
+                density={density}
+                eventsForDay={eventsForDay}
+                onCellClick={openCreateForDay}
+                onDaySelect={(ymd) => setSelectedYmd(ymd)}
+                selectedYmd={selectedYmd}
+                onMoreClick={(ymd) => setDayListYmd(ymd)}
+                onEventClick={(ev, e) => {
+                  if (isDraggingRef.current) return;
+                  setSelectedEvent(ev);
+                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                  setShowEventPanel(true);
+                }}
+              />
+            )}
+            {view === "week" && (
+              <WeekMemberMatrixView
+                weekDays={weekDays}
+                members={members.filter((m) => selectedMemberIds.size === 0 || selectedMemberIds.has(m.id))}
+                filteredSchedules={filteredSchedules}
+                density={density}
+                onCellClick={openCreateForDay}
+                onEventClick={(ev, e) => {
+                  if (isDraggingRef.current) return;
+                  setSelectedEvent(ev);
+                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                  setShowEventPanel(true);
+                }}
+              />
+            )}
+            {view === "timeline" && (
+              <TimelineView
+                tlMode={tlMode}
+                currentDate={currentDate}
+                year={y}
+                month={mo}
+                weekDays={weekDays}
+                collapsedDepts={collapsedDepts}
+                toggleCollapsed={toggleCollapsed}
+                filteredSchedules={filteredSchedules}
+                eventsForDay={eventsForDay}
+                onCellClick={openCreateForDay}
+                onEventClick={(ev, e) => {
+                  if (isDraggingRef.current) return;
+                  setSelectedEvent(ev);
+                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                  setShowEventPanel(true);
+                }}
+              />
+            )}
+          </div>
+
+          <Card className="min-h-0 overflow-hidden border-slate-200 bg-white shadow-sm">
+            <CardHeader className="py-2 px-3 border-b">
+              <CardTitle className="text-sm">本日の予定</CardTitle>
+            </CardHeader>
+            <CardContent className="py-2 px-3 space-y-2 max-h-[72vh] overflow-auto">
+              <p className="text-[11px] text-muted-foreground">{selectedYmd}</p>
+              {selectedDaySchedules.length === 0 ? (
+                <p className="text-xs text-muted-foreground">予定はありません</p>
+              ) : (
+                selectedDaySchedules.map((ev) => (
+                  <button
+                    key={`day-${ev.id}`}
+                    type="button"
+                    className="w-full text-left rounded-md border border-slate-200 p-2 hover:bg-slate-50"
+                    onClick={(e) => {
+                      setSelectedEvent(ev);
+                      setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                      setShowEventPanel(true);
+                    }}
+                  >
+                    <p className="text-[11px] text-muted-foreground">{formatEventTimeLabel(ev)}</p>
+                    <p className="text-xs font-semibold truncate">{ev.title}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{ev.user.displayName ?? ev.user.name}</p>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <DragOverlay>
@@ -1379,14 +1694,52 @@ function CalendarTab() {
             setSelectedEvent(null);
           }}
           onDelete={() => deleteMutation.mutate({ id: selectedEvent.id })}
+          onDuplicate={() => openDuplicateFromEvent(selectedEvent)}
           canDelete={canDeleteSchedule(user.id, user.role ?? "user", selectedEvent.userId, selectedEvent.user.role)}
-          addTask={() => {
-            if (!newTaskTitle.trim()) return;
-            addTaskMutation.mutate({ scheduleId: selectedEvent.id, title: newTaskTitle.trim() });
-          }}
+          addTask={addTasksFromInput}
           toggleTask={(taskId, completed) => toggleTaskMutation.mutate({ taskId, isCompleted: completed })}
           deleteTask={(taskId) => deleteTaskMutation.mutate({ taskId })}
+          taskAdding={addTaskMutation.isPending}
         />
+      )}
+
+      {dayListYmd && (
+        <>
+          <button type="button" className="fixed inset-0 z-[74] bg-black/25" aria-label="閉じる" onClick={() => setDayListYmd(null)} />
+          <Card className="fixed z-[75] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(96vw,540px)] max-h-[80vh] overflow-auto shadow-xl">
+            <CardHeader className="py-3">
+              <CardTitle className="text-base">{dayListYmd} の予定一覧</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {dayListEvents.length === 0 && <p className="text-sm text-muted-foreground">予定はありません</p>}
+              {dayListEvents.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  className="w-full text-left border rounded-md p-2 hover:bg-muted/40"
+                  onClick={() => {
+                    setDayListYmd(null);
+                    setSelectedEvent(ev);
+                    setPopoverAnchor({
+                      x: Math.max(24, Math.floor(window.innerWidth / 2) - 100),
+                      y: Math.max(24, Math.floor(window.innerHeight / 2) - 120),
+                    });
+                    setShowEventPanel(true);
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{formatEventTimeLabel(ev)}</Badge>
+                    <Badge variant="outline">{DEPT_CONFIG[(ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG]?.label ?? "全部署"}</Badge>
+                    <span className="font-medium truncate">{ev.title}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    担当: {ev.user.displayName ?? ev.user.name}
+                  </p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {showForm && (
@@ -1402,12 +1755,22 @@ function CalendarTab() {
               toast.error("タイトル・開始・終了は必須です");
               return;
             }
+            const start = new Date(formData.startAt);
+            const end = new Date(formData.endAt);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+              toast.error("開始・終了日時が不正です");
+              return;
+            }
+            if (start >= end) {
+              toast.error("終了日時は開始日時より後にしてください");
+              return;
+            }
             const dept = formData.scheduleType === "personal" ? "personal" : (formData.department as "maintenance");
             createMutation.mutate({
               title: formData.title.trim(),
               description: formData.description || null,
-              startAt: new Date(formData.startAt).toISOString(),
-              endAt: new Date(formData.endAt).toISOString(),
+              startAt: start.toISOString(),
+              endAt: end.toISOString(),
               allDay: formData.allDay,
               color: formData.color || null,
               scheduleType: formData.scheduleType === "personal" ? "personal" : "department",
@@ -1425,25 +1788,98 @@ function toDatetimeLocal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function MiniMonthPicker({
+  currentDate,
+  onPickDate,
+  onPrevMonth,
+  onNextMonth,
+}: {
+  currentDate: Date;
+  onPickDate: (d: Date) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+}) {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = formatYmd(new Date());
+  const cells = getMonthGridDates(year, month);
+  const selected = formatYmd(currentDate);
+  return (
+    <div className="border rounded-md p-2">
+      <div className="flex items-center justify-between mb-1">
+        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={onPrevMonth}>
+          <ChevronLeft className="h-3 w-3" />
+        </Button>
+        <div className="text-xs font-semibold">{year}年 {month + 1}月</div>
+        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={onNextMonth}>
+          <ChevronRight className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-[10px] text-center mb-0.5 text-muted-foreground">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={`mini-w-${w}`}>{w}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((d) => {
+          const ymd = formatYmd(d);
+          const inMonth = d.getMonth() === month;
+          const isToday = ymd === today;
+          const isSelected = ymd === selected;
+          return (
+            <button
+              key={`mini-${ymd}`}
+              type="button"
+              className={cn(
+                "h-6 rounded text-[10px]",
+                !inMonth && "opacity-35",
+                isHolidayOrSunday(d) && "text-pink-600",
+                isSaturday(d) && "text-sky-600",
+                isToday && "ring-1 ring-primary",
+                isSelected && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => onPickDate(new Date(d))}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MonthGridView({
   month,
   cells,
+  density,
   eventsForDay,
   onCellClick,
+  onDaySelect,
+  selectedYmd,
+  onMoreClick,
   onEventClick,
 }: {
   month: number;
   cells: Date[];
+  density: "comfortable" | "compact";
   eventsForDay: (ymd: string) => ScheduleRow[];
   onCellClick: (ymd: string) => void;
+  onDaySelect: (ymd: string) => void;
+  selectedYmd: string;
+  onMoreClick: (ymd: string) => void;
   onEventClick: (ev: ScheduleRow, e: React.MouseEvent) => void;
 }) {
   const todayYmd = formatYmd(new Date());
 
+  const cellMinHeight = density === "compact" ? "min-h-[108px]" : "min-h-[132px]";
+  const cellInnerMinHeight = density === "compact" ? "min-h-[96px]" : "min-h-[120px]";
+  const visibleEventCount = density === "compact" ? 3 : 2;
+
   return (
-    <div className="grid grid-cols-7 gap-px bg-border min-w-[720px]">
+    <div className="grid grid-cols-7 border-t border-l border-slate-200/70">
       {WEEKDAY_LABELS.map((w) => (
-        <div key={w} className="bg-muted text-center text-xs py-1 font-medium">
+        <div key={w} className="bg-slate-50 text-center text-xs py-2 font-medium border-r border-b border-slate-200/70">
           {w}
         </div>
       ))}
@@ -1452,6 +1888,7 @@ function MonthGridView({
         const inMonth = d.getMonth() === month;
         const list = eventsForDay(ymd);
         const hol = isHolidayOrSunday(d);
+        const holidayName = getHolidayName(d);
         const sat = isSaturday(d);
         const isToday = ymd === todayYmd;
 
@@ -1460,16 +1897,21 @@ function MonthGridView({
             key={ymd}
             id={`day-${ymd}`}
             className={cn(
-              "min-h-[88px] p-0.5 bg-background text-left align-top",
+              cellMinHeight + " p-1.5 border-r border-b border-slate-200/70 bg-background text-left align-top",
               !inMonth && "opacity-40",
-              hol && "bg-pink-100",
-              !hol && sat && "bg-sky-100"
+              hol && "bg-pink-50/70",
+              !hol && sat && "bg-sky-50/70",
+              selectedYmd === ymd && "bg-primary/5"
             )}
           >
             <div
               role="presentation"
-              className="w-full h-full text-left flex flex-col min-h-[80px] cursor-pointer"
-              onClick={() => onCellClick(ymd)}
+              className={cn("w-full h-full text-left flex flex-col cursor-pointer", cellInnerMinHeight)}
+              onClick={() => onDaySelect(ymd)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onCellClick(ymd);
+              }}
             >
               <div className="flex items-center justify-between px-0.5">
                 <span
@@ -1480,21 +1922,39 @@ function MonthGridView({
                 >
                   {d.getDate()}
                 </span>
+                {holidayName && <span className="text-[9px] text-pink-700 truncate max-w-[56px]">{holidayName}</span>}
               </div>
-              <div className="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
-                {list.slice(0, 3).map((ev) => {
-                  const dk = (ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG;
-                  const cfg = DEPT_CONFIG[dk] ?? DEPT_CONFIG.all;
+              <div className="flex-1 flex flex-col gap-1 mt-1 overflow-hidden">
+                {list.slice(0, visibleEventCount).map((ev) => {
                   return (
-                    <DraggableEventChip key={ev.id} id={`event-${ev.id}`} className={cn(cfg.bg, "text-white border-white/30")}>
+                    <DraggableEventChip
+                      key={ev.id}
+                      id={`event-${ev.id}`}
+                      dense={false}
+                      className={cn(
+                        getDeptChipClass(ev.scheduleDepartment),
+                        getDeptAccentClass(ev.scheduleDepartment),
+                        "border-l-4 min-h-[28px] px-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
+                      )}
+                    >
                       <span onClick={(e) => { e.stopPropagation(); onEventClick(ev, e); }} className="truncate">
-                        {ev.title}
+                        <span className="text-[10px] opacity-80 mr-1">{formatEventTimeLabel(ev)}</span>
+                        <span className="text-[11px] font-semibold">{ev.title}</span>
                       </span>
                     </DraggableEventChip>
                   );
                 })}
-                {list.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground">+{list.length - 3}件</span>
+                {list.length > visibleEventCount && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground text-left hover:underline px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoreClick(ymd);
+                    }}
+                  >
+                    他 {list.length - visibleEventCount} 件
+                  </button>
                 )}
               </div>
             </div>
@@ -1505,62 +1965,130 @@ function MonthGridView({
   );
 }
 
-function WeekGridView({
+function WeekMemberMatrixView({
   weekDays,
-  eventsForDay,
+  members,
+  filteredSchedules,
+  density,
   onCellClick,
   onEventClick,
 }: {
   weekDays: Date[];
-  eventsForDay: (ymd: string) => ScheduleRow[];
+  members: {
+    id: number;
+    name: string;
+    displayName: string | null;
+  }[];
+  filteredSchedules: ScheduleRow[];
+  density: "comfortable" | "compact";
   onCellClick: (ymd: string) => void;
   onEventClick: (ev: ScheduleRow, e: React.MouseEvent) => void;
 }) {
   const todayYmd = formatYmd(new Date());
+  const cellMinHeight = density === "compact" ? "min-h-[86px]" : "min-h-[112px]";
+  const visibleCount = density === "compact" ? 3 : 2;
 
   return (
-    <div className="grid grid-cols-7 gap-px bg-border min-w-[720px]">
-      {weekDays.map((d) => {
-        const ymd = formatYmd(d);
-        const list = eventsForDay(ymd);
-        const hol = isHolidayOrSunday(d);
-        const sat = isSaturday(d);
-        const isToday = ymd === todayYmd;
-        return (
-          <DroppableCell
-            key={ymd}
-            id={`week-${ymd}`}
-            className={cn(
-              "min-h-[220px] p-1 bg-background flex flex-col",
-              hol && "bg-pink-100",
-              !hol && sat && "bg-sky-100"
-            )}
+    <div className="min-w-[980px]">
+      <div
+        className="grid border-b bg-slate-100 sticky top-0 z-20"
+        style={{ gridTemplateColumns: "180px repeat(7, minmax(0, 1fr))" }}
+      >
+        <div className="p-2 text-xs font-semibold border-r bg-slate-100">メンバー</div>
+        {weekDays.map((d) => {
+          const ymd = formatYmd(d);
+          const hol = isHolidayOrSunday(d);
+          const sat = isSaturday(d);
+          const isToday = ymd === todayYmd;
+          const holidayName = getHolidayName(d);
+          return (
+            <div key={ymd} className={cn("p-2 border-r text-center", hol && "bg-pink-50", !hol && sat && "bg-sky-50", isToday && "bg-primary/10")}>
+              <div className="text-[11px] text-muted-foreground tracking-wide">{WEEKDAY_LABELS[d.getDay()]}</div>
+              <div className={cn("text-base font-semibold leading-tight", isToday && "text-primary")}>{d.getDate()}</div>
+              {holidayName && <div className="text-[9px] text-pink-700 truncate">{holidayName}</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="max-h-[70vh] overflow-auto">
+        {members.map((m) => (
+          <div
+            key={m.id}
+            className="grid border-b"
+            style={{ gridTemplateColumns: "180px repeat(7, minmax(0, 1fr))" }}
           >
-            <div className="text-left shrink-0 mb-1 w-full cursor-pointer" onClick={() => onCellClick(ymd)}>
-              <span className="text-[11px] text-muted-foreground block">{WEEKDAY_LABELS[d.getDay()]}</span>
-              <span
-                className={cn(
-                  "text-sm font-semibold inline-flex w-7 h-7 items-center justify-center rounded-full",
-                  isToday && "bg-primary text-primary-foreground"
-                )}
-              >
-                {d.getDate()}
+            <div className="p-2 text-xs font-medium border-r sticky left-0 bg-white z-10 truncate flex items-center gap-2">
+              <span className="inline-flex h-5 w-5 rounded-full bg-slate-200 text-[10px] items-center justify-center text-slate-700">
+                {(m.displayName ?? m.name).slice(0, 1)}
               </span>
+              <span className="truncate">{m.displayName ?? m.name}</span>
             </div>
-            <div className="flex flex-col gap-1 overflow-auto flex-1">
-              {list.map((ev) => {
-                const dk = (ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG;
-                const cfg = DEPT_CONFIG[dk] ?? DEPT_CONFIG.all;
-                return (
-                  <DraggableEventChip key={ev.id} id={`event-${ev.id}`} className={cn(cfg.bg, "text-white border-white/30")}>
-                    <span onClick={(e) => { e.stopPropagation(); onEventClick(ev, e); }}>{ev.title}</span>
-                  </DraggableEventChip>
-                );
-              })}
-            </div>
-          </DroppableCell>
-        );
-      })}
+            {weekDays.map((d) => {
+              const ymd = formatYmd(d);
+              const hol = isHolidayOrSunday(d);
+              const sat = isSaturday(d);
+              const list = filteredSchedules
+                .filter((ev) => ev.userId === m.id && formatYmd(ev.startAt) <= ymd && ymd <= formatYmd(ev.endAt))
+                .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+              return (
+                <DroppableCell
+                  key={`${m.id}-${ymd}`}
+                  id={`week-${ymd}-${m.id}`}
+                  className={cn(
+                    "p-1 border-r flex flex-col gap-1 relative",
+                    cellMinHeight,
+                    hol && "bg-pink-50",
+                    !hol && sat && "bg-sky-50",
+                    "hover:bg-muted/20 transition-colors"
+                  )}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    onCellClick(ymd);
+                  }}
+                >
+                  {list.length === 0 && (
+                    <button
+                      type="button"
+                      className="absolute right-1 top-1 text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => onCellClick(ymd)}
+                      aria-label="予定を追加"
+                    >
+                      +
+                    </button>
+                  )}
+                  {list.slice(0, visibleCount).map((ev) => (
+                    <DraggableEventChip
+                      key={ev.id}
+                      id={`event-${ev.id}`}
+                      dense={density === "compact"}
+                      className={cn(
+                        getDeptChipClass(ev.scheduleDepartment),
+                        getDeptAccentClass(ev.scheduleDepartment),
+                        "border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      )}
+                    >
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick(ev, e);
+                        }}
+                        className="block"
+                      >
+                        <span className="block text-[10px] opacity-90 leading-tight">{formatEventTimeLabel(ev)}</span>
+                        <span className="block truncate text-[11px] leading-tight">{ev.title}</span>
+                      </span>
+                    </DraggableEventChip>
+                  ))}
+                  {list.length > visibleCount && (
+                    <span className="text-[10px] text-muted-foreground px-1">+{list.length - visibleCount}件</span>
+                  )}
+                </DroppableCell>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1709,6 +2237,10 @@ function TimelineView({
                       hol && "bg-pink-50",
                       !hol && sat && "bg-sky-50"
                     )}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onCellClick(ymd);
+                    }}
                   >
                     <button type="button" className="text-[10px] text-muted-foreground w-full" onClick={() => onCellClick(ymd)}>
                       {d.getDate()}
@@ -1743,10 +2275,12 @@ function EventPopover({
   taskProgress,
   onClose,
   onDelete,
+  onDuplicate,
   canDelete,
   addTask,
   toggleTask,
   deleteTask,
+  taskAdding,
 }: {
   anchor: { x: number; y: number };
   event: ScheduleRow;
@@ -1756,10 +2290,12 @@ function EventPopover({
   taskProgress: number;
   onClose: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   canDelete: boolean;
-  addTask: () => void;
+  addTask: () => void | Promise<void>;
   toggleTask: (id: number, completed: boolean) => void;
   deleteTask: (id: number) => void;
+  taskAdding: boolean;
 }) {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -1781,10 +2317,14 @@ function EventPopover({
           </Button>
         </CardHeader>
         <CardContent className="space-y-3 text-sm px-3 pb-3">
-          <div className={cn("inline-block text-xs px-2 py-0.5 rounded border", DEPT_CONFIG[dk]?.border ?? "", DEPT_CONFIG[dk]?.bg, "text-white")}>
-            {DEPT_CONFIG[dk]?.label ?? dk}
+          <div className="flex flex-wrap items-center gap-1">
+            <div className={cn("inline-block text-xs px-2 py-0.5 rounded border", DEPT_CONFIG[dk]?.border ?? "", DEPT_CONFIG[dk]?.bg, "text-white")}>
+              {DEPT_CONFIG[dk]?.label ?? dk}
+            </div>
+            <Badge variant="outline">担当: {event.user.displayName ?? event.user.name}</Badge>
+            <Badge variant="outline">{event.scheduleType === "personal" ? "個人予定" : "部署予定"}</Badge>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground font-medium">
             {event.startAt.toLocaleString()} 〜 {event.endAt.toLocaleString()}
           </p>
           {event.description && <p className="text-xs whitespace-pre-wrap">{event.description}</p>}
@@ -1794,19 +2334,22 @@ function EventPopover({
               <div className="h-full bg-primary transition-all" style={{ width: `${taskProgress * 100}%` }} />
             </div>
             <div className="flex gap-1">
-              <Input
+              <textarea
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
-                placeholder="タスクを追加"
-                className="h-8 text-xs"
+                placeholder="タスクを追加（改行で複数入力）"
+                className="w-full border rounded-md min-h-[56px] px-2 py-1 text-xs bg-background"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
-                    addTask();
+                    void addTask();
                   }
                 }}
               />
             </div>
+            <Button type="button" size="sm" variant="secondary" disabled={taskAdding || !newTaskTitle.trim()} onClick={() => void addTask()}>
+              {taskAdding ? "追加中..." : "タスクを追加"}
+            </Button>
             <ul className="max-h-32 overflow-auto space-y-1">
               {tasks.map((t) => (
                 <li key={t.id} className="flex items-center gap-2 text-xs">
@@ -1825,9 +2368,14 @@ function EventPopover({
           </div>
 
           {canDelete && (
-            <Button type="button" variant="destructive" size="sm" className="w-full" onClick={onDelete}>
-              スケジュールを削除
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={onDuplicate}>
+                複製して作成
+              </Button>
+              <Button type="button" variant="destructive" size="sm" className="w-full" onClick={onDelete}>
+                スケジュールを削除
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1858,7 +2406,7 @@ function CreateFormModal({
   return (
     <>
       <button type="button" className="fixed inset-0 z-[80] bg-black/40" aria-label="閉じる" onClick={onClose} />
-      <Card className="fixed z-[90] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(96vw,420px)] max-h-[90vh] overflow-auto shadow-xl">
+      <Card className="fixed z-[90] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(96vw,440px)] max-h-[90vh] overflow-auto shadow-xl border-slate-200">
         <CardHeader>
           <CardTitle>予定を追加</CardTitle>
         </CardHeader>
