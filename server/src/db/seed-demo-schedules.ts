@@ -34,6 +34,10 @@ const PERSONAL_TITLES = [
 
 const DURATION_OPTIONS = [30, 45, 60, 75, 90, 105, 120, 150, 180] as const;
 
+const DEMO_BUSINESS_DEPTS = ["maintenance", "painting", "slitter", "drone"] as const;
+
+type DemoBusinessDept = (typeof DEMO_BUSINESS_DEPTS)[number];
+
 type ScheduleDepartment = "maintenance" | "painting" | "slitter" | "drone" | "all" | "personal";
 
 function assertSafeToRun(): void {
@@ -68,15 +72,14 @@ function parseTargetMonth(): { year: number; month: number; label: string } {
   return { year: y, month: mo, label: `${y}-${pad(mo)} (default: current month)` };
 }
 
-function departmentScopeFromUserDept(dept: string | null): ScheduleDepartment {
-  if (!dept) return "all";
-  const d = dept.trim().toLowerCase();
-  if (d === "maintenance") return "maintenance";
-  if (d === "painting") return "painting";
-  if (d === "slitter") return "slitter";
-  if (d === "drone") return "drone";
-  if (d === "admin") return "all";
-  return "all";
+/** Department demo rows: concrete dept only (no scheduleDepartment=all). */
+function demoDepartmentKeyForUser(userDept: string | null, day: number, userId: number): DemoBusinessDept {
+  const d = userDept?.trim().toLowerCase() ?? "";
+  if (d === "maintenance" || d === "painting" || d === "slitter" || d === "drone") {
+    return d;
+  }
+  const idx = (day + userId * 3) % DEMO_BUSINESS_DEPTS.length;
+  return DEMO_BUSINESS_DEPTS[idx];
 }
 
 function durationMins(seed: number): number {
@@ -170,7 +173,7 @@ async function main() {
   for (let day = 1; day <= daysInMonth; day++) {
     for (const user of teamUsers) {
       const seed = day + user.id;
-      const deptScope = departmentScopeFromUserDept(user.department ?? null);
+      const deptKey = demoDepartmentKeyForUser(user.department ?? null, day, user.id);
 
       if (seed % 2 === 0) {
         const h = 8 + (day % 5);
@@ -185,7 +188,7 @@ async function main() {
           startAt,
           endAt,
           scheduleType: "department",
-          scheduleDepartment: deptScope,
+          scheduleDepartment: deptKey,
         });
       }
 
