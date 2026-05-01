@@ -1477,7 +1477,7 @@ function CalendarTab() {
 
       <div className="flex min-h-0 flex-col">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)_250px] items-stretch gap-2">
+          <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)_228px] items-stretch gap-1.5">
           <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
             <CardHeader className="shrink-0 py-1.5 px-2 border-b">
               <CardTitle className="text-sm flex items-center gap-1">

@@ -237,8 +237,15 @@ function ScheduleColumn({
         <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-800">
           {title}
         </div>
-        <div className="flex min-h-0 flex-1 items-start justify-center overflow-x-hidden px-2 py-3">
-          <p className="text-center text-xs text-muted-foreground leading-relaxed">{emptyHint}</p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+            <div className="space-y-2 px-2 py-2">
+              <p className="flex h-[5rem] shrink-0 flex-col justify-center overflow-y-auto text-center text-xs text-muted-foreground leading-relaxed">
+                {emptyHint}
+              </p>
+              <DayTimeline timed={[]} dayStart={dayStart} onEventClick={onEventClick} />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -276,7 +283,9 @@ function ScheduleColumn({
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
           {!hasAny ? (
             <div className="space-y-2 px-2 py-2">
-              <p className="text-center text-xs text-muted-foreground">この日の予定はありません</p>
+              <p className="flex h-[5rem] shrink-0 flex-col justify-center text-center text-xs text-muted-foreground leading-relaxed">
+                この日の予定はありません
+              </p>
               <DayTimeline timed={[]} dayStart={dayStart} onEventClick={onEventClick} />
             </div>
           ) : (
