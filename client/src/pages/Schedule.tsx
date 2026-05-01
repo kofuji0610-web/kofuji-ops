@@ -2215,9 +2215,8 @@ function PersonalWeekCompareView({
                     id={`event-${ev.id}`}
                     dense={density === "compact"}
                     className={cn(
-                      getDeptChipClass(ev.scheduleDepartment),
-                      getDeptAccentClass(ev.scheduleDepartment),
-                      "border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      "border border-slate-200 bg-white text-slate-800 border-l-[3px] border-l-slate-300",
+                      "shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                     )}
                   >
                     <span
@@ -2225,10 +2224,16 @@ function PersonalWeekCompareView({
                         e.stopPropagation();
                         onEventClick(ev, e);
                       }}
-                      className="block"
+                      className="flex min-w-0 w-full items-start gap-1"
                     >
-                      <span className="block text-[10px] opacity-90 leading-tight">{formatEventTimeLabel(ev)}</span>
-                      <span className="block truncate text-[11px] leading-tight">{ev.title}</span>
+                      <UserCircle className="h-3 w-3 shrink-0 text-slate-500" aria-hidden />
+                      <span className="min-w-0 flex-1 flex flex-col gap-0">
+                        <span className="text-[10px] leading-tight text-slate-600">{formatEventTimeLabel(ev)}</span>
+                        <span className="truncate text-[11px] leading-tight text-slate-800">{ev.title}</span>
+                        <span className="truncate text-[9px] leading-tight text-slate-500">
+                          {ev.user.displayName ?? ev.user.name}
+                        </span>
+                      </span>
                     </span>
                   </DraggableEventChip>
                 ))}
