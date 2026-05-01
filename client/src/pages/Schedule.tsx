@@ -1499,27 +1499,33 @@ function CalendarTab() {
                 <p className="rounded-md border border-slate-200/80 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
                   表示部署
                 </p>
-                <div className="space-y-1.5">
-                  {BUSINESS_DEPT_KEYS.map((k) => (
-                    <label
-                      key={`side-${k}`}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-md border border-slate-200/70 bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50/90"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-primary"
-                        checked={activeDepts.has(k)}
-                        onChange={() => toggleDeptFilter(k)}
-                      />
-                      <span
+                <div className="grid grid-cols-2 gap-1.5">
+                  {BUSINESS_DEPT_KEYS.map((k) => {
+                    const deptOn = activeDepts.has(k);
+                    return (
+                      <button
+                        key={`side-${k}`}
+                        type="button"
+                        aria-pressed={deptOn}
+                        onClick={() => toggleDeptFilter(k)}
                         className={cn(
-                          "inline-block h-3 w-3 shrink-0 rounded-full border shadow-sm",
-                          getDeptChipClass(k)
+                          "flex min-w-0 items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
+                          deptOn
+                            ? "border-transparent bg-primary/15 text-slate-900 ring-1 ring-primary/25"
+                            : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/90"
                         )}
-                      />
-                      <span className="truncate font-medium text-slate-800">{DEPT_CONFIG[k].label}</span>
-                    </label>
-                  ))}
+                      >
+                        <span
+                          className={cn(
+                            "inline-block h-2.5 w-2.5 shrink-0 rounded-full border shadow-sm",
+                            getDeptChipClass(k)
+                          )}
+                          aria-hidden
+                        />
+                        <span className="truncate">{DEPT_CONFIG[k].label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1528,16 +1534,14 @@ function CalendarTab() {
                   メンバー
                 </p>
                 <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
-                  {members.map((m) => (
-                    <label
-                      key={m.id}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-md border border-slate-200/70 bg-white px-2 py-1.5 text-sm shadow-sm transition-colors hover:bg-slate-50/90"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-primary"
-                        checked={selectedMemberIds.has(m.id)}
-                        onChange={() =>
+                  {members.map((m) => {
+                    const memberOn = selectedMemberIds.has(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        aria-pressed={memberOn}
+                        onClick={() =>
                           setSelectedMemberIds((prev) => {
                             const n = new Set(prev);
                             if (n.has(m.id)) n.delete(m.id);
@@ -1545,12 +1549,24 @@ function CalendarTab() {
                             return n;
                           })
                         }
-                      />
-                      <span style={{ color: memberColor(m.id) }} className="truncate font-medium">
-                        {m.displayName ?? m.name}
-                      </span>
-                    </label>
-                  ))}
+                        className={cn(
+                          "flex w-full min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm shadow-sm transition-colors",
+                          memberOn
+                            ? "border-transparent bg-primary/15 font-medium text-slate-900 ring-1 ring-primary/25"
+                            : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/90"
+                        )}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/5"
+                          style={{ backgroundColor: memberColor(m.id) }}
+                          aria-hidden
+                        />
+                        <span className="truncate" style={{ color: memberColor(m.id) }}>
+                          {m.displayName ?? m.name}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>

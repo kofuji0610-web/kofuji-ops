@@ -25,6 +25,13 @@ const DEPT_DOT_CLASS: Record<string, string> = {
   personal: "bg-pink-300",
 };
 
+/** Same scale for both columns (px per hour, 24h = full day). */
+const PIXELS_PER_HOUR = 48;
+const DAY_MINUTES = 24 * 60;
+const TIMELINE_HEIGHT_PX = 24 * PIXELS_PER_HOUR;
+const HALF_H = PIXELS_PER_HOUR / 2;
+const MIN_EVENT_PX = 22;
+
 function isBusinessDeptKey(k: string): boolean {
   return (BUSINESS_DEPT_KEYS as readonly string[]).includes(k);
 }
@@ -76,6 +83,213 @@ function dotClass(ev: PersonalDayEvent): string {
   return DEPT_DOT_CLASS[sd] ?? DEPT_DOT_CLASS.all;
 }
 
+function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+function endOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
+}
+
+/** Clip [start,end) to local calendar day of `day`. Returns null if no overlap. */
+function clipTimedSegmentToDay(
+  ev: PersonalDayEvent,
+  dayStart: Date,
+  dayEnd: Date
+): { start: Date; end: Date } | null {
+  if (ev.allDay) return null;
+  const s = ev.startAt.getTime();
+  const e = ev.endAt.getTime();
+  const ds = dayStart.getTime();
+  const de = dayEnd.getTime();
+  const cs = Math.max(s, ds);
+  const ce = Math.min(e, de);
+  if (ce <= cs) return null;
+  return { start: new Date(cs), end: new Date(ce) };
+}
+
+function segmentLayout(
+  seg: { start: Date; end: Date },
+  dayStart: Date
+): { top: number; height: number } {
+  const fromMidnightMin = (seg.start.getTime() - dayStart.getTime()) / 60_000;
+  const durMin = (seg.end.getTime() - seg.start.getTime()) / 60_000;
+  const top = (fromMidnightMin / DAY_MINUTES) * TIMELINE_HEIGHT_PX;
+  const height = Math.max((durMin / DAY_MINUTES) * TIMELINE_HEIGHT_PX, MIN_EVENT_PX);
+  return { top, height };
+}
+
+const HALF_HOUR_LINES = Array.from({ length: 48 }, (_, i) => ({
+  key: `slot-${i}`,
+  top: (i + 1) * HALF_H,
+  dashed: (i + 1) % 2 !== 0,
+}));
+
+const HOUR_LABELS = Array.from({ length: 24 }, (_, h) => ({
+  h,
+  top: h * PIXELS_PER_HOUR,
+  text: `${String(h).padStart(2, "0")}:00`,
+}));
+
+function EventBlock({
+  ev,
+  dayStart,
+  onEventClick,
+}: {
+  ev: PersonalDayEvent;
+  dayStart: Date;
+  onEventClick: (ev: PersonalDayEvent, e: React.MouseEvent) => void;
+}) {
+  const seg = clipTimedSegmentToDay(ev, dayStart, endOfLocalDay(dayStart));
+  if (!seg) return null;
+  const { top, height } = segmentLayout(seg, dayStart);
+  return (
+    <button
+      type="button"
+      style={{ top, height }}
+      className={cn(
+        "absolute right-1 left-1 z-[1] flex min-h-0 min-w-0 flex-col overflow-hidden rounded border border-slate-200/90 bg-white/95 px-1 py-0.5 text-left shadow-sm backdrop-blur-[1px] transition-colors hover:bg-white",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+      )}
+      onClick={(e) => onEventClick(ev, e)}
+    >
+      <span className="flex min-w-0 items-center gap-1">
+        <span className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", dotClass(ev), "ring-1 ring-black/5")} aria-hidden />
+        <span className="truncate text-[10px] font-semibold leading-tight text-slate-800">{ev.title}</span>
+      </span>
+      <span className="mt-0.5 font-mono text-[9px] tabular-nums text-slate-400">
+        {formatHm(seg.start)}–{formatHm(seg.end)}
+      </span>
+    </button>
+  );
+}
+
+function DayTimeline({
+  timed,
+  dayStart,
+  onEventClick,
+}: {
+  timed: readonly PersonalDayEvent[];
+  dayStart: Date;
+  onEventClick: (ev: PersonalDayEvent, e: React.MouseEvent) => void;
+}) {
+  return (
+    <div className="flex w-full min-w-0">
+      <div
+        className="relative w-10 shrink-0 select-none border-r border-slate-100/90 bg-white"
+        style={{ height: TIMELINE_HEIGHT_PX }}
+      >
+        {HOUR_LABELS.map(({ h, top, text }) => (
+          <span
+            key={h}
+            className="absolute left-0 right-0 pr-0.5 text-right font-mono text-[10px] tabular-nums leading-none text-slate-400/90"
+            style={{ top: top + 2 }}
+          >
+            {text}
+          </span>
+        ))}
+      </div>
+      <div className="relative min-h-0 min-w-0 flex-1 bg-slate-50/35" style={{ height: TIMELINE_HEIGHT_PX }}>
+        {HALF_HOUR_LINES.map(({ key, top, dashed }) => (
+          <div
+            key={key}
+            className={cn(
+              "pointer-events-none absolute right-0 left-0 z-0 border-b",
+              dashed ? "border-dashed border-slate-200/55" : "border-slate-200/70"
+            )}
+            style={{ top }}
+          />
+        ))}
+        {timed.map((ev) => (
+          <EventBlock key={ev.id} ev={ev} dayStart={dayStart} onEventClick={onEventClick} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleColumn({
+  title,
+  emptyHint,
+  events,
+  dayStart,
+  onEventClick,
+}: {
+  title: string;
+  emptyHint: string | null;
+  events: readonly PersonalDayEvent[];
+  dayStart: Date;
+  onEventClick: (ev: PersonalDayEvent, e: React.MouseEvent) => void;
+}) {
+  const { allDay, timed } = useMemo(() => {
+    const ad: PersonalDayEvent[] = [];
+    const td: PersonalDayEvent[] = [];
+    for (const ev of events) {
+      if (ev.allDay) ad.push(ev);
+      else if (clipTimedSegmentToDay(ev, dayStart, endOfLocalDay(dayStart))) td.push(ev);
+    }
+    return { allDay: ad, timed: td };
+  }, [events, dayStart]);
+
+  if (emptyHint) {
+    return (
+      <div className="flex min-h-0 min-w-0 flex-col">
+        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-800">
+          {title}
+        </div>
+        <div className="flex min-h-0 flex-1 items-start justify-center overflow-x-hidden px-2 py-3">
+          <p className="text-center text-xs text-muted-foreground leading-relaxed">{emptyHint}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasAny = allDay.length > 0 || timed.length > 0;
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col">
+      <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-800">
+        {title}
+      </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+        {allDay.length > 0 && (
+          <div className="shrink-0 space-y-1 border-b border-slate-100 bg-slate-50/50 px-2 py-1.5">
+            <p className="text-[10px] font-medium text-slate-400">終日</p>
+            <div className="flex flex-wrap gap-1">
+              {allDay.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  className={cn(
+                    "inline-flex max-w-full min-w-0 items-center gap-1 rounded border border-slate-200/90 bg-white px-1.5 py-0.5 text-left text-[10px] font-medium text-slate-800 shadow-sm hover:bg-slate-50",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  )}
+                  onClick={(e) => onEventClick(ev, e)}
+                >
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(ev))} aria-hidden />
+                  <span className="truncate">{ev.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+          {!hasAny ? (
+            <div className="space-y-2 px-2 py-2">
+              <p className="text-center text-xs text-muted-foreground">この日の予定はありません</p>
+              <DayTimeline timed={[]} dayStart={dayStart} onEventClick={onEventClick} />
+            </div>
+          ) : (
+            <div className="px-0 py-1">
+              <DayTimeline timed={timed} dayStart={dayStart} onEventClick={onEventClick} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PersonalDayView({
   schedules,
   currentDate,
@@ -88,6 +302,7 @@ export function PersonalDayView({
   onEventClick: (ev: PersonalDayEvent, e: React.MouseEvent) => void;
 }) {
   const ymd = useMemo(() => formatYmd(currentDate), [currentDate]);
+  const dayStart = useMemo(() => startOfLocalDay(currentDate), [currentDate]);
   const deptKeys = useMemo(() => parseUserBusinessDepartments(user), [user.department]);
   const userDeptSet = useMemo(() => new Set<BusinessDeptKey>(deptKeys), [deptKeys]);
 
@@ -105,51 +320,6 @@ export function PersonalDayView({
     return { left: dept, right: mine };
   }, [schedules, ymd, user.id, deptKeys, userDeptSet]);
 
-  const timeLabel = (ev: PersonalDayEvent) => (ev.allDay ? "終日" : formatHm(ev.startAt));
-
-  const renderColumn = (title: string, emptyHint: string | null, list: PersonalDayEvent[]) => (
-    <div className="flex min-h-0 min-w-0 flex-col">
-      <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-800">
-        {title}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 [scrollbar-width:thin]">
-        {emptyHint ? (
-          <p className="text-center text-xs text-muted-foreground leading-relaxed">{emptyHint}</p>
-        ) : list.length === 0 ? (
-          <p className="text-center text-xs text-muted-foreground">この日の予定はありません</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {list.map((ev) => (
-              <li key={ev.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex w-full min-w-0 items-start gap-2 rounded-md border border-slate-200/90 bg-white px-2 py-1.5 text-left text-slate-900 shadow-sm transition-colors hover:bg-slate-50/90",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                  )}
-                  onClick={(e) => onEventClick(ev, e)}
-                >
-                  <span className="w-11 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                    {timeLabel(ev)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", dotClass(ev), "ring-1 ring-black/5")}
-                        aria-hidden
-                      />
-                      <span className="line-clamp-2 text-xs font-medium">{ev.title}</span>
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-
   const deptEmptyHint =
     deptKeys.length === 0
       ? "所属部署が設定されていません。システム管理者に所属の登録を依頼してください。"
@@ -158,8 +328,14 @@ export function PersonalDayView({
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-white">
       <div className="grid h-full min-h-0 min-w-0 max-w-full grid-cols-2 divide-x divide-slate-200">
-        {renderColumn("部署スケジュール", deptEmptyHint, deptKeys.length === 0 ? [] : left)}
-        {renderColumn("個人スケジュール", null, right)}
+        <ScheduleColumn
+          title="部署スケジュール"
+          emptyHint={deptEmptyHint}
+          events={deptKeys.length === 0 ? [] : left}
+          dayStart={dayStart}
+          onEventClick={onEventClick}
+        />
+        <ScheduleColumn title="個人スケジュール" emptyHint={null} events={right} dayStart={dayStart} onEventClick={onEventClick} />
       </div>
     </div>
   );
