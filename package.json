@@ -14,6 +14,7 @@
     "db:push": "cd server && npm run db:push",
     "db:migrate": "cd server && npm run db:migrate",
     "db:seed": "cd server && npm run db:seed",
+    "db:seed:demo": "cd server && npm run db:seed:demo",
     "db:studio": "cd server && npm run db:studio",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install"
   },
