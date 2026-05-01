@@ -1572,9 +1572,12 @@ function CalendarTab() {
                 <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
                   {members.map((m) => {
                     const memberOn = selectedMemberIds.has(m.id);
+                    const firstBizDept = parseUserBusinessDeptKeys(m.department ?? null)[0] as
+                      | keyof typeof DEPT_CONFIG
+                      | undefined;
                     const deptHex =
-                      (m.department
-                        ? DEPT_CONFIG[m.department as keyof typeof DEPT_CONFIG]?.color
+                      (firstBizDept && DEPT_CONFIG[firstBizDept]
+                        ? DEPT_CONFIG[firstBizDept].color
                         : undefined) ?? DEPT_CONFIG.all.color;
                     return (
                       <button
