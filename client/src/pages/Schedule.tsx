@@ -1379,7 +1379,7 @@ function CalendarTab() {
   }, [view, tlMode, density, scheduleScope, activeDepts, selectedMemberIds]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-2 p-3 bg-slate-100/70">
+    <div className="flex min-h-min w-full flex-col gap-2 p-3 pb-10 bg-slate-100/70">
       <div className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="min-w-[160px]">
@@ -1472,9 +1472,9 @@ function CalendarTab() {
         </Badge>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-col">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="grid min-h-0 flex-1 grid-cols-[250px_minmax(0,1fr)_260px] items-stretch gap-2">
+          <div className="grid min-h-0 grid-cols-[250px_minmax(0,1fr)_260px] items-stretch gap-2">
           <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
             <CardHeader className="shrink-0 py-2 px-3 border-b">
               <CardTitle className="text-sm flex items-center gap-1">
@@ -1572,7 +1572,7 @@ function CalendarTab() {
             </CardContent>
           </Card>
 
-          <div className="flex min-h-0 min-w-0 flex-col overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-x-auto rounded-lg border border-slate-200/80 bg-white shadow-sm">
             {view === "month" && (
               <MonthGridView
                 month={mo}
@@ -2552,7 +2552,7 @@ function CreateFormModal({
 
 export default function SchedulePage() {
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex min-h-full flex-col pb-6">
       <Tabs defaultValue="calendar" className="flex flex-col flex-1 min-h-0">
         <TabsList className="shrink-0 mx-4 mt-2">
           <TabsTrigger value="calendar">カレンダー</TabsTrigger>
@@ -2560,7 +2560,7 @@ export default function SchedulePage() {
           <TabsTrigger value="hours">工数管理</TabsTrigger>
           <TabsTrigger value="notification">通知設定</TabsTrigger>
         </TabsList>
-        <TabsContent value="calendar" className="flex-1 min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="calendar" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden mt-0 data-[state=inactive]:hidden">
           <CalendarTab />
         </TabsContent>
         <TabsContent value="shift" className="flex-1 overflow-auto p-4 mt-0 data-[state=inactive]:hidden">
