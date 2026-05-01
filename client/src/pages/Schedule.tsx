@@ -2089,7 +2089,7 @@ function PersonalWeekCompareView({
         style={{ gridTemplateColumns: "88px minmax(0, 1fr) minmax(0, 1fr)" }}
       >
         <div className="p-2 border-r bg-slate-100" aria-hidden />
-        <div className="p-2 text-xs font-semibold border-r bg-slate-100 text-center">所属スケジュール</div>
+        <div className="p-2 text-xs font-semibold border-r bg-slate-100 text-center">部署スケジュール</div>
         <div className="p-2 text-xs font-semibold bg-slate-100 text-center">個人スケジュール</div>
       </div>
 
