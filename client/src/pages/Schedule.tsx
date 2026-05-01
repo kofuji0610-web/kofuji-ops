@@ -1298,11 +1298,11 @@ function CalendarTab() {
 
   const navPrev = () => {
     if (view === "month") {
-      setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()));
+      setCurrentDate((d) => addMonths(d, -1));
     } else if (view === "week") {
       setCurrentDate((d) => addDays(d, -7));
     } else if (view === "timeline") {
-      if (tlMode === "month") setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()));
+      if (tlMode === "month") setCurrentDate((d) => addMonths(d, -1));
       else if (tlMode === "week") setCurrentDate((d) => addDays(d, -7));
       else setCurrentDate((d) => addDays(d, -1));
     }
@@ -1310,11 +1310,11 @@ function CalendarTab() {
 
   const navNext = () => {
     if (view === "month") {
-      setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+      setCurrentDate((d) => addMonths(d, 1));
     } else if (view === "week") {
       setCurrentDate((d) => addDays(d, 7));
     } else if (view === "timeline") {
-      if (tlMode === "month") setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+      if (tlMode === "month") setCurrentDate((d) => addMonths(d, 1));
       else if (tlMode === "week") setCurrentDate((d) => addDays(d, 7));
       else setCurrentDate((d) => addDays(d, 1));
     }
@@ -1431,36 +1431,58 @@ function CalendarTab() {
                 全体共有
               </Button>
             </div>
-            <div className="flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex flex-wrap items-center gap-1">
               <Button
                 type="button"
-                variant={view === "timeline" && tlMode === "day" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
-                onClick={() => {
-                  setView("timeline");
-                  setTlMode("day");
-                }}
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={navPrev}
+                aria-label="Previous"
               >
-                日
+                <ChevronLeft className="h-4 w-4" />
               </Button>
+              <div className="flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                <Button
+                  type="button"
+                  variant={view === "timeline" && tlMode === "day" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                  onClick={() => {
+                    setView("timeline");
+                    setTlMode("day");
+                  }}
+                >
+                  日
+                </Button>
+                <Button
+                  type="button"
+                  variant={view === "week" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                  onClick={() => setView("week")}
+                >
+                  週
+                </Button>
+                <Button
+                  type="button"
+                  variant={view === "month" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                  onClick={() => setView("month")}
+                >
+                  月
+                </Button>
+              </div>
               <Button
                 type="button"
-                variant={view === "week" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
-                onClick={() => setView("week")}
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={navNext}
+                aria-label="Next"
               >
-                週
-              </Button>
-              <Button
-                type="button"
-                variant={view === "month" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
-                onClick={() => setView("month")}
-              >
-                月
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
