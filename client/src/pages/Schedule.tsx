@@ -70,6 +70,16 @@ function isBusinessDeptKey(k: string): boolean {
   return (BUSINESS_DEPT_KEYS as readonly string[]).includes(k);
 }
 
+function parseUserBusinessDeptKeys(department: string | null): string[] {
+  if (!department?.trim()) return [];
+  const out: string[] = [];
+  for (const part of department.split(",")) {
+    const t = part.trim();
+    if (isBusinessDeptKey(t)) out.push(t);
+  }
+  return out;
+}
+
 function normalizeActiveDeptsPref(saved?: string[]): Set<string> {
   const fallback = () => new Set<string>([...BUSINESS_DEPT_KEYS]);
   if (!saved?.length) return fallback();
@@ -1625,21 +1635,39 @@ function CalendarTab() {
                 }}
               />
             )}
-            {view === "week" && (
-              <WeekMemberMatrixView
-                weekDays={weekDays}
-                members={members.filter((m) => selectedMemberIds.size === 0 || selectedMemberIds.has(m.id))}
-                filteredSchedules={filteredSchedules}
-                density={density}
-                onCellClick={openCreateForDay}
-                onEventClick={(ev, e) => {
-                  if (isDraggingRef.current) return;
-                  setSelectedEvent(ev);
-                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                  setShowEventPanel(true);
-                }}
-              />
-            )}
+            {view === "week" &&
+              (scheduleScope === "personal" && user ? (
+                <PersonalWeekCompareView
+                  weekDays={weekDays}
+                  user={{ id: user.id, department: user.department }}
+                  schedules={schedules}
+                  filteredSchedules={filteredSchedules}
+                  density={density}
+                  activeDepts={activeDepts}
+                  selectedMemberIds={selectedMemberIds}
+                  onCellClick={openCreateForDay}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              ) : (
+                <WeekMemberMatrixView
+                  weekDays={weekDays}
+                  members={members.filter((m) => selectedMemberIds.size === 0 || selectedMemberIds.has(m.id))}
+                  filteredSchedules={filteredSchedules}
+                  density={density}
+                  onCellClick={openCreateForDay}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              ))}
             {view === "timeline" && (
               scheduleScope === "personal" && tlMode === "day" && user ? (
                 <PersonalDayView
@@ -2007,6 +2035,213 @@ function MonthGridView({
           </DroppableCell>
         );
       })}
+    </div>
+  );
+}
+
+function PersonalWeekCompareView({
+  weekDays,
+  user,
+  schedules,
+  filteredSchedules,
+  density,
+  activeDepts,
+  selectedMemberIds,
+  onCellClick,
+  onEventClick,
+}: {
+  weekDays: Date[];
+  user: { id: number; department: string | null };
+  schedules: ScheduleRow[];
+  filteredSchedules: ScheduleRow[];
+  density: "comfortable" | "compact";
+  activeDepts: Set<string>;
+  selectedMemberIds: Set<number>;
+  onCellClick: (ymd: string) => void;
+  onEventClick: (ev: ScheduleRow, e: React.MouseEvent) => void;
+}) {
+  const todayYmd = formatYmd(new Date());
+  const cellMinHeight = density === "compact" ? "min-h-[86px]" : "min-h-[112px]";
+  const visibleCount = density === "compact" ? 3 : 2;
+
+  const userDeptKeys = useMemo(() => parseUserBusinessDeptKeys(user.department), [user.department]);
+  const userDeptSet = useMemo(() => new Set(userDeptKeys), [userDeptKeys]);
+
+  return (
+    <div className="min-w-[min(100%,720px)]">
+      <div
+        className="grid border-b bg-slate-100 sticky top-0 z-20"
+        style={{ gridTemplateColumns: "88px minmax(0, 1fr) minmax(0, 1fr)" }}
+      >
+        <div className="p-2 border-r bg-slate-100" aria-hidden />
+        <div className="p-2 text-xs font-semibold border-r bg-slate-100 text-center">所属スケジュール</div>
+        <div className="p-2 text-xs font-semibold bg-slate-100 text-center">個人スケジュール</div>
+      </div>
+
+      <div className="max-h-[70vh] overflow-auto">
+        {weekDays.map((d) => {
+          const ymd = formatYmd(d);
+          const hol = isHolidayOrSunday(d);
+          const sat = isSaturday(d);
+          const isToday = ymd === todayYmd;
+
+          const deptList = schedules
+            .filter((ev) => {
+              const ds = formatYmd(ev.startAt);
+              const de = formatYmd(ev.endAt);
+              if (ds > ymd || de < ymd) return false;
+              const st = (ev.scheduleType ?? "").toLowerCase();
+              const sdRaw = ev.scheduleDepartment ?? "all";
+              if (st === "personal" || sdRaw === "personal") return false;
+              const dept = sdRaw as keyof typeof DEPT_CONFIG;
+              const dk = DEPT_CONFIG[dept] ? dept : "all";
+              if (dk !== "personal" && dk !== "all" && !activeDepts.has(dk as string)) return false;
+              if (selectedMemberIds.size > 0 && !selectedMemberIds.has(ev.userId)) return false;
+              if (userDeptKeys.length === 0) return false;
+              if (sdRaw === "all") return true;
+              return userDeptSet.has(sdRaw);
+            })
+            .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+          const personalList = filteredSchedules
+            .filter((ev) => {
+              const ds = formatYmd(ev.startAt);
+              const de = formatYmd(ev.endAt);
+              return ds <= ymd && ymd <= de;
+            })
+            .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+          return (
+            <div
+              key={ymd}
+              className="grid border-b"
+              style={{ gridTemplateColumns: "88px minmax(0, 1fr) minmax(0, 1fr)" }}
+            >
+              <div
+                className={cn(
+                  "p-2 border-r flex flex-col justify-center gap-0.5 text-xs font-medium",
+                  hol && "bg-pink-50",
+                  !hol && sat && "bg-sky-50",
+                  isToday && "bg-primary/10"
+                )}
+              >
+                <span className={cn("tabular-nums", isToday && "text-primary font-semibold")}>
+                  {d.getMonth() + 1}/{d.getDate()}
+                </span>
+                <span className="text-[11px] text-muted-foreground leading-none">
+                  ({WEEKDAY_LABELS[d.getDay()]})
+                </span>
+              </div>
+
+              <DroppableCell
+                id={`week-pwc-dept-${ymd}`}
+                className={cn(
+                  "p-1 border-r flex flex-col gap-1 relative",
+                  cellMinHeight,
+                  hol && "bg-pink-50",
+                  !hol && sat && "bg-sky-50",
+                  "hover:bg-muted/20 transition-colors"
+                )}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onCellClick(ymd);
+                }}
+              >
+                {deptList.length === 0 && (
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={() => onCellClick(ymd)}
+                    aria-label="予定を追加"
+                  >
+                    +
+                  </button>
+                )}
+                {deptList.slice(0, visibleCount).map((ev) => (
+                  <DraggableEventChip
+                    key={ev.id}
+                    id={`event-${ev.id}`}
+                    dense={density === "compact"}
+                    className={cn(
+                      getDeptChipClass(ev.scheduleDepartment),
+                      getDeptAccentClass(ev.scheduleDepartment),
+                      "border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    )}
+                  >
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(ev, e);
+                      }}
+                      className="block"
+                    >
+                      <span className="block text-[10px] opacity-90 leading-tight">{formatEventTimeLabel(ev)}</span>
+                      <span className="block truncate text-[11px] leading-tight">{ev.title}</span>
+                    </span>
+                  </DraggableEventChip>
+                ))}
+                {deptList.length > visibleCount && (
+                  <span className="text-[10px] text-muted-foreground px-1">+{deptList.length - visibleCount}件</span>
+                )}
+              </DroppableCell>
+
+              <DroppableCell
+                id={`week-pwc-prs-${ymd}`}
+                className={cn(
+                  "p-1 flex flex-col gap-1 relative",
+                  cellMinHeight,
+                  hol && "bg-pink-50",
+                  !hol && sat && "bg-sky-50",
+                  "hover:bg-muted/20 transition-colors"
+                )}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onCellClick(ymd);
+                }}
+              >
+                {personalList.length === 0 && (
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={() => onCellClick(ymd)}
+                    aria-label="予定を追加"
+                  >
+                    +
+                  </button>
+                )}
+                {personalList.slice(0, visibleCount).map((ev) => (
+                  <DraggableEventChip
+                    key={ev.id}
+                    id={`event-${ev.id}`}
+                    dense={density === "compact"}
+                    className={cn(
+                      getDeptChipClass(ev.scheduleDepartment),
+                      getDeptAccentClass(ev.scheduleDepartment),
+                      "border-l-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    )}
+                  >
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(ev, e);
+                      }}
+                      className="block"
+                    >
+                      <span className="block text-[10px] opacity-90 leading-tight">{formatEventTimeLabel(ev)}</span>
+                      <span className="block truncate text-[11px] leading-tight">{ev.title}</span>
+                    </span>
+                  </DraggableEventChip>
+                ))}
+                {personalList.length > visibleCount && (
+                  <span className="text-[10px] text-muted-foreground px-1">
+                    +{personalList.length - visibleCount}件
+                  </span>
+                )}
+              </DroppableCell>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
