@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths } from "date-fns";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
+import { PersonalDayView } from "@/components/schedule/PersonalDayView";
 import { canEditScheduleOf } from "@/utils/schedulePermission";
 
 // ─── 定数（全タブ共通） ───────────────────────────────────────────────────────
@@ -1590,24 +1591,38 @@ function CalendarTab() {
               />
             )}
             {view === "timeline" && (
-              <TimelineView
-                tlMode={tlMode}
-                currentDate={currentDate}
-                year={y}
-                month={mo}
-                weekDays={weekDays}
-                collapsedDepts={collapsedDepts}
-                toggleCollapsed={toggleCollapsed}
-                filteredSchedules={filteredSchedules}
-                eventsForDay={eventsForDay}
-                onCellClick={openCreateForDay}
-                onEventClick={(ev, e) => {
-                  if (isDraggingRef.current) return;
-                  setSelectedEvent(ev);
-                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                  setShowEventPanel(true);
-                }}
-              />
+              scheduleScope === "personal" && tlMode === "day" && user ? (
+                <PersonalDayView
+                  schedules={filteredSchedules}
+                  currentDate={currentDate}
+                  user={{ id: user.id, department: user.department }}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev as ScheduleRow);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              ) : (
+                <TimelineView
+                  tlMode={tlMode}
+                  currentDate={currentDate}
+                  year={y}
+                  month={mo}
+                  weekDays={weekDays}
+                  collapsedDepts={collapsedDepts}
+                  toggleCollapsed={toggleCollapsed}
+                  filteredSchedules={filteredSchedules}
+                  eventsForDay={eventsForDay}
+                  onCellClick={openCreateForDay}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              )
             )}
           </div>
 
