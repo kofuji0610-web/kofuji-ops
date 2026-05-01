@@ -24,13 +24,46 @@ const DEPT_LABELS: Record<string, string> = {
   admin: "管理",
 };
 
+const DEPT_OPTION_ORDER = [
+  "maintenance",
+  "painting",
+  "slitter",
+  "drone",
+  "warehouse",
+  "operation",
+  "admin",
+] as const;
+
+function departmentsToPayload(keys: string[]): string | null {
+  const ordered = DEPT_OPTION_ORDER.filter((k) => keys.includes(k));
+  return ordered.length === 0 ? null : ordered.join(",");
+}
+
+function parseDepartmentsFromUser(raw: string | null | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((k) => (DEPT_OPTION_ORDER as readonly string[]).includes(k));
+}
+
+function formatUserDepartmentsList(raw: string | null | undefined): string {
+  if (!raw?.trim()) return "-";
+  const keys = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (keys.length === 0) return "-";
+  return keys.map((k) => DEPT_LABELS[k] ?? k).join("・");
+}
+
 interface UserForm {
   username: string;
   password: string;
   name: string;
   displayName: string;
   role: "user" | "manager" | "admin";
-  department: string;
+  departmentKeys: string[];
 }
 
 const DEFAULT_FORM: UserForm = {
@@ -39,7 +72,7 @@ const DEFAULT_FORM: UserForm = {
   name: "",
   displayName: "",
   role: "user",
-  department: "maintenance",
+  departmentKeys: [],
 };
 
 export default function AdminUsers() {
@@ -80,13 +113,14 @@ export default function AdminUsers() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const deptPayload = departmentsToPayload(form.departmentKeys);
     if (editId !== null) {
       updateMutation.mutate({
         id: editId,
         name: form.name,
         displayName: form.displayName || null,
         role: form.role,
-        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "warehouse" | "operation" | "admin") || null,
+        department: deptPayload,
         ...(form.password ? { password: form.password } : {}),
       });
     } else {
@@ -96,7 +130,7 @@ export default function AdminUsers() {
         name: form.name,
         displayName: form.displayName || null,
         role: form.role,
-        department: (form.department as "maintenance" | "painting" | "slitter" | "drone" | "warehouse" | "operation" | "admin") || null,
+        department: deptPayload,
       });
     }
   };
@@ -109,7 +143,7 @@ export default function AdminUsers() {
       name: user.name,
       displayName: user.displayName ?? "",
       role: (user.role as "user" | "manager" | "admin") ?? "user",
-      department: user.department ?? "maintenance",
+      departmentKeys: parseDepartmentsFromUser(user.department),
     });
     setShowForm(true);
   };
@@ -170,7 +204,7 @@ export default function AdminUsers() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <Label>権限</Label>
                   <select
                     value={form.role}
@@ -182,21 +216,28 @@ export default function AdminUsers() {
                     <option value="admin">管理者</option>
                   </select>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label>部署</Label>
-                  <select
-                    value={form.department}
-                    onChange={(e) => setForm((p) => ({ ...p, department: e.target.value }))}
-                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="maintenance">整備</option>
-                    <option value="painting">塗装</option>
-                    <option value="slitter">スリッター</option>
-                    <option value="drone">ドローン</option>
-                    <option value="warehouse">倉庫</option>
-                    <option value="operation">運行管理</option>
-                    <option value="admin">管理</option>
-                  </select>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-2 rounded-md border border-input bg-background p-2">
+                    {DEPT_OPTION_ORDER.map((key) => (
+                      <label key={key} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={form.departmentKeys.includes(key)}
+                          onChange={(e) => {
+                            setForm((p) => ({
+                              ...p,
+                              departmentKeys: e.target.checked
+                                ? [...p.departmentKeys, key]
+                                : p.departmentKeys.filter((k) => k !== key),
+                            }));
+                          }}
+                          className="rounded border-input"
+                        />
+                        <span>{DEPT_LABELS[key]}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div>
@@ -250,8 +291,7 @@ export default function AdminUsers() {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      @{user.username} ·{" "}
-                      {DEPT_LABELS[user.department ?? ""] ?? user.department ?? "-"}
+                      @{user.username} · {formatUserDepartmentsList(user.department)}
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0">

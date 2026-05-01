@@ -6,6 +6,50 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import { hashPassword } from "../lib/auth";
 
+const DEPARTMENT_KEYS = [
+  "maintenance",
+  "painting",
+  "slitter",
+  "drone",
+  "warehouse",
+  "operation",
+  "admin",
+] as const;
+
+const ALLOWED_DEPARTMENT_SET = new Set<string>(DEPARTMENT_KEYS);
+
+/** Comma-separated keys in users.department; null if empty. Max length matches varchar(50). */
+function normalizeDepartmentForDb(raw: string | null | undefined): string | null {
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).trim();
+  if (s === "") return null;
+  const tokens = s.split(",").map((t) => t.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const t of tokens) {
+    if (!ALLOWED_DEPARTMENT_SET.has(t)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `無効な部署です: ${t}`,
+      });
+    }
+    if (!seen.has(t)) {
+      seen.add(t);
+      ordered.push(t);
+    }
+  }
+  const result = ordered.join(",");
+  if (result.length > 50) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "部署の指定が長すぎます（50文字以内）",
+    });
+  }
+  return ordered.length === 0 ? null : result;
+}
+
+const departmentFieldSchema = z.union([z.string(), z.null()]).optional();
+
 export const usersRouter = router({
   // ─── ユーザー一覧を取得（管理者のみ） ────────────────────────────────────────
   list: adminProcedure.query(async () => {
@@ -36,14 +80,12 @@ export const usersRouter = router({
         displayName: z.string().optional().nullable(),
         email: z.string().email().optional().nullable(),
         role: z.enum(["user", "manager", "leader", "admin"]).default("user"),
-        department: z
-          .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
-          .optional()
-          .nullable(),
+        department: departmentFieldSchema,
       })
     )
     .mutation(async ({ input }) => {
-      const { password, ...rest } = input;
+      const { password, department: deptRaw, ...rest } = input;
+      const department = normalizeDepartmentForDb(deptRaw);
 
       // ユーザー名の重複チェック
       const [existing] = await db
@@ -60,7 +102,7 @@ export const usersRouter = router({
       }
 
       const passwordHash = await hashPassword(password);
-      await db.insert(users).values({ ...rest, passwordHash });
+      await db.insert(users).values({ ...rest, department, passwordHash });
       return { success: true };
     }),
 
@@ -73,20 +115,20 @@ export const usersRouter = router({
         displayName: z.string().optional().nullable(),
         email: z.string().email().optional().nullable(),
         role: z.enum(["user", "manager", "leader", "admin"]).optional(),
-        department: z
-          .enum(["maintenance", "painting", "slitter", "drone", "warehouse", "operation", "admin"])
-          .optional()
-          .nullable(),
+        department: departmentFieldSchema,
         isActive: z.boolean().optional(),
         password: z.string().min(6).optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const { id, password, ...rest } = input;
+      const { id, password, department: deptRaw, ...rest } = input;
       const updateData: Record<string, unknown> = { ...rest };
 
       if (password) {
         updateData.passwordHash = await hashPassword(password);
+      }
+      if (deptRaw !== undefined) {
+        updateData.department = normalizeDepartmentForDb(deptRaw);
       }
 
       await db.update(users).set(updateData).where(eq(users.id, id));
