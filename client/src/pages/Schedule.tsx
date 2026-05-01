@@ -1923,6 +1923,16 @@ function MiniMonthPicker({
   );
 }
 
+function monthEventColorKey(ev: ScheduleRow): string | null | undefined {
+  const st = (ev.scheduleType ?? "").toLowerCase();
+  const sd = ev.scheduleDepartment ?? "all";
+  if (st === "personal" || sd === "personal") {
+    const keys = parseUserBusinessDeptKeys(ev.user?.department ?? null);
+    return keys[0] ?? "personal";
+  }
+  return ev.scheduleDepartment;
+}
+
 function MonthGridView({
   month,
   cells,
@@ -2000,14 +2010,15 @@ function MonthGridView({
               </div>
               <div className="flex-1 flex flex-col gap-1 mt-1 overflow-hidden">
                 {list.slice(0, visibleEventCount).map((ev) => {
+                  const colorKey = monthEventColorKey(ev);
                   return (
                     <DraggableEventChip
                       key={ev.id}
                       id={`event-${ev.id}`}
                       dense={false}
                       className={cn(
-                        getDeptChipClass(ev.scheduleDepartment),
-                        getDeptAccentClass(ev.scheduleDepartment),
+                        getDeptChipClass(colorKey),
+                        getDeptAccentClass(colorKey),
                         "border-l-4 min-h-[26px] px-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
                       )}
                     >
