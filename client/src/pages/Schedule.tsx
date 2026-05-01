@@ -12,7 +12,17 @@ import {
 } from "@dnd-kit/core";
 import holidayJp from "@holiday-jp/holiday_jp";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, GripVertical, Users, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
+  Paintbrush,
+  Plane,
+  Scissors,
+  Users,
+  Wrench,
+  X,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +53,13 @@ const DEPT_KEYS = Object.keys(DEPT_CONFIG) as (keyof typeof DEPT_CONFIG)[];
 
 /** 左フィルター・部署予定フォーム・日表示の部署行（all / personal は DEPT_CONFIG に残す） */
 const BUSINESS_DEPT_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
+
+const DEPT_FILTER_ICON_COMPONENTS = {
+  maintenance: Wrench,
+  painting: Paintbrush,
+  slitter: Scissors,
+  drone: Plane,
+} as const;
 
 type BusinessDeptKey = (typeof BUSINESS_DEPT_KEYS)[number];
 
@@ -1474,15 +1491,15 @@ function CalendarTab() {
 
       <div className="flex min-h-0 flex-col">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="grid min-h-0 grid-cols-[250px_minmax(0,1fr)_260px] items-stretch gap-2">
+          <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)_250px] items-stretch gap-2">
           <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
-            <CardHeader className="shrink-0 py-2 px-3 border-b">
+            <CardHeader className="shrink-0 py-1.5 px-2 border-b">
               <CardTitle className="text-sm flex items-center gap-1">
                 <Users className="h-4 w-4" />
                 フィルター
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-2 px-3">
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden py-1.5 px-2">
               <div className="shrink-0">
                 <MiniMonthPicker
                   currentDate={currentDate}
@@ -1495,13 +1512,15 @@ function CalendarTab() {
                 />
               </div>
 
-              <div className="shrink-0 space-y-2">
-                <p className="rounded-md border border-slate-200/80 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+              <div className="shrink-0 space-y-1.5">
+                <p className="rounded-md border border-slate-200/80 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                   表示部署
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-1">
                   {BUSINESS_DEPT_KEYS.map((k) => {
                     const deptOn = activeDepts.has(k);
+                    const deptHex = DEPT_CONFIG[k].color;
+                    const DeptFilterIcon = DEPT_FILTER_ICON_COMPONENTS[k];
                     return (
                       <button
                         key={`side-${k}`}
@@ -1509,31 +1528,30 @@ function CalendarTab() {
                         aria-pressed={deptOn}
                         onClick={() => toggleDeptFilter(k)}
                         className={cn(
-                          "flex min-w-0 items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
-                          deptOn
-                            ? "border-transparent bg-primary/15 text-slate-900 ring-1 ring-primary/25"
-                            : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/90"
+                          "flex min-w-0 items-center justify-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
+                          deptOn ? "font-semibold shadow-md" : "shadow-sm hover:brightness-[0.97]"
                         )}
+                        style={{
+                          backgroundColor: deptOn ? `${deptHex}48` : `${deptHex}22`,
+                          border: deptOn
+                            ? `2px solid ${deptHex}`
+                            : `1px solid rgba(203, 213, 225, 0.55)`,
+                          boxShadow: deptOn ? "0 1px 4px rgba(15, 23, 42, 0.07)" : undefined,
+                        }}
                       >
-                        <span
-                          className={cn(
-                            "inline-block h-2.5 w-2.5 shrink-0 rounded-full border shadow-sm",
-                            getDeptChipClass(k)
-                          )}
-                          aria-hidden
-                        />
-                        <span className="truncate">{DEPT_CONFIG[k].label}</span>
+                        <DeptFilterIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                        <span className="min-w-0 truncate">{DEPT_CONFIG[k].label}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col gap-2">
-                <p className="shrink-0 rounded-md border border-slate-200/80 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                <p className="shrink-0 rounded-md border border-slate-200/80 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                   メンバー
                 </p>
-                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
+                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
                   {members.map((m) => {
                     const memberOn = selectedMemberIds.has(m.id);
                     return (
@@ -1550,7 +1568,7 @@ function CalendarTab() {
                           })
                         }
                         className={cn(
-                          "flex w-full min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm shadow-sm transition-colors",
+                          "flex w-full min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs shadow-sm transition-colors",
                           memberOn
                             ? "border-transparent bg-primary/15 font-medium text-slate-900 ring-1 ring-primary/25"
                             : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/90"
