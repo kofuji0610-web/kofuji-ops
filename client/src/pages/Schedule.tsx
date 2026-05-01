@@ -1640,6 +1640,7 @@ function CalendarTab() {
                 <PersonalWeekCompareView
                   weekDays={weekDays}
                   user={{ id: user.id, department: user.department }}
+                  viewerRole={user.role ?? "user"}
                   schedules={schedules}
                   filteredSchedules={filteredSchedules}
                   density={density}
@@ -2053,6 +2054,7 @@ function MonthGridView({
 function PersonalWeekCompareView({
   weekDays,
   user,
+  viewerRole,
   schedules,
   filteredSchedules,
   density,
@@ -2063,6 +2065,7 @@ function PersonalWeekCompareView({
 }: {
   weekDays: Date[];
   user: { id: number; department: string | null };
+  viewerRole: string;
   schedules: ScheduleRow[];
   filteredSchedules: ScheduleRow[];
   density: "comfortable" | "compact";
@@ -2077,6 +2080,7 @@ function PersonalWeekCompareView({
 
   const userDeptKeys = useMemo(() => parseUserBusinessDeptKeys(user.department), [user.department]);
   const userDeptSet = useMemo(() => new Set(userDeptKeys), [userDeptKeys]);
+  const managerBroadDeptColumn = viewerRole === "manager" && userDeptKeys.length === 0;
 
   return (
     <div className="min-w-[min(100%,720px)]">
@@ -2108,7 +2112,11 @@ function PersonalWeekCompareView({
               const dk = DEPT_CONFIG[dept] ? dept : "all";
               if (dk !== "personal" && dk !== "all" && !activeDepts.has(dk as string)) return false;
               if (selectedMemberIds.size > 0 && !selectedMemberIds.has(ev.userId)) return false;
-              if (userDeptKeys.length === 0) return false;
+              if (userDeptKeys.length === 0) {
+                if (!managerBroadDeptColumn) return false;
+                if (sdRaw === "all") return false;
+                return isBusinessDeptKey(sdRaw);
+              }
               if (sdRaw === "all") return true;
               return userDeptSet.has(sdRaw);
             })
