@@ -12,15 +12,7 @@ import {
 } from "@dnd-kit/core";
 import holidayJp from "@holiday-jp/holiday_jp";
 import { toast } from "sonner";
-import {
-  ChevronLeft,
-  ChevronRight,
-  GripVertical,
-  LayoutGrid,
-  List,
-  Users,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, GripVertical, Users, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +39,26 @@ const DEPT_CONFIG = {
 } as const;
 
 const DEPT_KEYS = Object.keys(DEPT_CONFIG) as (keyof typeof DEPT_CONFIG)[];
+
+/** 左フィルター・部署予定フォーム・日表示の部署行（all / personal は DEPT_CONFIG に残す） */
+const BUSINESS_DEPT_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
+
+type BusinessDeptKey = (typeof BUSINESS_DEPT_KEYS)[number];
+
+const DEFAULT_FORM_DEPT: BusinessDeptKey = BUSINESS_DEPT_KEYS[0];
+
+function isBusinessDeptKey(k: string): boolean {
+  return (BUSINESS_DEPT_KEYS as readonly string[]).includes(k);
+}
+
+function normalizeActiveDeptsPref(saved?: string[]): Set<string> {
+  const fallback = () => new Set<string>([...BUSINESS_DEPT_KEYS]);
+  if (!saved?.length) return fallback();
+  const filtered = saved.filter(isBusinessDeptKey);
+  return filtered.length ? new Set(filtered) : fallback();
+}
+
+type ScheduleScopeTab = "personal" | "department" | "overall";
 
 const MEMBER_COLORS = [
   "#60A5FA",
@@ -87,6 +99,7 @@ type CalendarPrefs = {
   view?: "month" | "week" | "timeline";
   tlMode?: "month" | "week" | "day";
   density?: "comfortable" | "compact";
+  scheduleScope?: ScheduleScopeTab;
   activeDepts?: string[];
   selectedMemberIds?: number[];
 };
@@ -233,6 +246,27 @@ type ScheduleRow = {
     displayName: string | null;
   };
 };
+
+const DEPT_SCOPE_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
+
+function matchesScheduleScope(s: ScheduleRow, scope: ScheduleScopeTab): boolean {
+  const st = (s.scheduleType ?? "").toLowerCase();
+  const sd = s.scheduleDepartment ?? "all";
+  if (scope === "personal") {
+    return st === "personal" || sd === "personal";
+  }
+  if (scope === "overall") {
+    return sd === "all";
+  }
+  if (st === "personal" || sd === "personal") return false;
+  if (sd === "all") return false;
+  return (DEPT_SCOPE_KEYS as readonly string[]).includes(sd);
+}
+
+function normalizeScheduleScope(v: unknown): ScheduleScopeTab {
+  if (v === "personal" || v === "department" || v === "overall") return v;
+  return "department";
+}
 
 // ─── シフト・工数タブ ───────────────────────────────────────────────────────
 
@@ -971,33 +1005,42 @@ function CalendarTab() {
   const utils = trpc.useUtils();
   const [initialPrefs] = useState<CalendarPrefs>(() => loadCalendarPrefs());
 
-  const [view, setView] = useState<"month" | "week" | "timeline">("month");
+  const [view, setView] = useState<"month" | "week" | "timeline">(() => {
+    const v = initialPrefs.view;
+    if (v === "month" || v === "week" || v === "timeline") return v;
+    return "month";
+  });
   const [tlMode, setTlMode] = useState<"month" | "week" | "day">(initialPrefs.tlMode ?? "month");
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [activeDepts, setActiveDepts] = useState<Set<string>>(
-    () =>
-      new Set(
-        initialPrefs.activeDepts?.length
-          ? initialPrefs.activeDepts
-          : ["maintenance", "painting", "slitter", "drone", "all", "personal"]
-      )
+  const [activeDepts, setActiveDepts] = useState<Set<string>>(() =>
+    normalizeActiveDeptsPref(initialPrefs.activeDepts)
   );
-  const [density, setDensity] = useState<"comfortable" | "compact">(initialPrefs.density ?? "comfortable");
+  const [density] = useState<"comfortable" | "compact">(initialPrefs.density ?? "comfortable");
+  const [scheduleScope, setScheduleScope] = useState<ScheduleScopeTab>(() =>
+    normalizeScheduleScope(initialPrefs.scheduleScope)
+  );
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<number>>(
     () => new Set(initialPrefs.selectedMemberIds ?? [])
   );
-  const [sidebarFilterMode, setSidebarFilterMode] = useState<"department" | "member">("department");
-  const [memberQuery, setMemberQuery] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<ScheduleRow | null>(null);
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string;
+    scheduleType: "department" | "personal";
+    department: BusinessDeptKey;
+    startAt: string;
+    endAt: string;
+    allDay: boolean;
+    color: string;
+  }>({
     title: "",
     description: "",
-    scheduleType: "department" as "department" | "personal",
-    department: "all",
+    scheduleType: "department",
+    department: DEFAULT_FORM_DEPT,
     startAt: "",
     endAt: "",
     allDay: false,
@@ -1118,7 +1161,7 @@ function CalendarTab() {
       title: "",
       description: "",
       scheduleType: "department",
-      department: "all",
+      department: DEFAULT_FORM_DEPT,
       startAt: "",
       endAt: "",
       allDay: false,
@@ -1128,13 +1171,14 @@ function CalendarTab() {
 
   const filteredSchedules = useMemo(() => {
     return schedules.filter((s) => {
+      if (!matchesScheduleScope(s, scheduleScope)) return false;
       const dept = (s.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG;
       const dk = DEPT_CONFIG[dept] ? dept : "all";
-      if (!activeDepts.has(dk)) return false;
+      if (dk !== "personal" && dk !== "all" && !activeDepts.has(dk)) return false;
       if (selectedMemberIds.size > 0 && !selectedMemberIds.has(s.userId)) return false;
       return true;
     });
-  }, [schedules, activeDepts, selectedMemberIds]);
+  }, [schedules, scheduleScope, activeDepts, selectedMemberIds]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -1211,11 +1255,18 @@ function CalendarTab() {
   };
 
   const openDuplicateFromEvent = (ev: ScheduleRow) => {
+    const dupDeptRaw = ev.scheduleDepartment ?? "all";
+    const dupDepartment: BusinessDeptKey =
+      ev.scheduleType === "personal"
+        ? DEFAULT_FORM_DEPT
+        : isBusinessDeptKey(dupDeptRaw)
+          ? (dupDeptRaw as BusinessDeptKey)
+          : DEFAULT_FORM_DEPT;
     setFormData({
       title: `${ev.title}（複製）`,
       description: ev.description ?? "",
       scheduleType: (ev.scheduleType === "personal" ? "personal" : "department") as "department" | "personal",
-      department: ev.scheduleDepartment ?? "all",
+      department: dupDepartment,
       startAt: toDatetimeLocal(ev.startAt),
       endAt: toDatetimeLocal(ev.endAt),
       allDay: ev.allDay,
@@ -1282,14 +1333,6 @@ function CalendarTab() {
     });
   };
 
-  const activateAllDepts = () => {
-    setActiveDepts(new Set(DEPT_KEYS));
-  };
-
-  const clearAllDepts = () => {
-    setActiveDepts(new Set());
-  };
-
   const toggleCollapsed = (key: string) => {
     setCollapsedDepts((prev) => {
       const n = new Set(prev);
@@ -1310,20 +1353,6 @@ function CalendarTab() {
             ? `${format(weekDays[0], "yyyy年M月d日")} - ${format(weekDays[6], "M月d日")}`
             : `${format(currentDate, "yyyy年M月d日")}`;
 
-  useEffect(() => {
-    // 初期表示を必ず月ビューに固定
-    setView("month");
-  }, []);
-
-  const filteredMembers = useMemo(() => {
-    const q = memberQuery.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) => {
-      const name = (m.displayName ?? m.name ?? "").toLowerCase();
-      return name.includes(q);
-    });
-  }, [members, memberQuery]);
-
   const dayListEvents = useMemo(() => {
     if (!dayListYmd) return [];
     return eventsForDay(dayListYmd);
@@ -1341,246 +1370,192 @@ function CalendarTab() {
       view,
       tlMode,
       density,
-      activeDepts: [...activeDepts],
+      scheduleScope,
+      activeDepts: [...activeDepts].filter(isBusinessDeptKey),
       selectedMemberIds: [...selectedMemberIds],
     };
     window.localStorage.setItem(CALENDAR_PREFS_KEY, JSON.stringify(prefs));
-  }, [view, tlMode, density, activeDepts, selectedMemberIds]);
+  }, [view, tlMode, density, scheduleScope, activeDepts, selectedMemberIds]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2 p-3 bg-slate-100/70">
-      <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-          <div className="min-w-[220px]">
-            <h2 className="text-base font-semibold tracking-wide">スケジュール</h2>
-            <p className="text-xs text-muted-foreground">メンバー・部署ごとの予定を一覧で確認できます</p>
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-2 p-3 bg-slate-100/70">
+      <div className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div className="min-w-[160px]">
+            <h2 className="text-sm font-semibold tracking-wide text-slate-800">スケジュール</h2>
           </div>
 
           <div className="text-center">
-            <p className="text-lg font-semibold tracking-wide text-slate-800">{periodLabel}</p>
+            <p className="text-base font-semibold tracking-wide text-slate-800">{periodLabel}</p>
           </div>
 
-          <div className="flex items-center justify-start gap-1 lg:justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              今日
-            </Button>
-            <Button type="button" variant="outline" size="icon" onClick={navPrev} aria-label="前">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button type="button" variant="outline" size="icon" onClick={navNext} aria-label="次">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button type="button" size="sm" className="ml-1" onClick={() => setShowForm(true)}>
+          <div className="flex items-center justify-start lg:justify-end">
+            <Button type="button" size="sm" className="h-8 shrink-0 px-3 text-xs" onClick={() => setShowForm(true)}>
               ＋ 新規予定
             </Button>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-          <Button
-            type="button"
-            variant={view === "month" ? "secondary" : "ghost"}
-            size="sm"
-              className="h-8 rounded-md"
-            onClick={() => setView("month")}
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" />
-            月
-          </Button>
-          <Button
-            type="button"
-            variant={view === "week" ? "secondary" : "ghost"}
-            size="sm"
-              className="h-8 rounded-md"
-            onClick={() => setView("week")}
-          >
-            週
-          </Button>
-          <Button
-            type="button"
-            variant={view === "timeline" ? "secondary" : "ghost"}
-            size="sm"
-              className="h-8 rounded-md"
-            onClick={() => setView("timeline")}
-          >
-            <List className="h-4 w-4 mr-1" />
-            TL
-          </Button>
-        </div>
-
-        {view === "timeline" && (
-            <div className="flex gap-1">
-            {(["month", "week", "day"] as const).map((m) => (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5">
               <Button
-                key={m}
                 type="button"
+                variant={scheduleScope === "personal" ? "secondary" : "ghost"}
                 size="sm"
-                variant={tlMode === m ? "default" : "outline"}
-                onClick={() => setTlMode(m)}
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => setScheduleScope("personal")}
               >
-                {m === "month" ? "月" : m === "week" ? "週" : "日"}
+                個人
               </Button>
-            ))}
+              <Button
+                type="button"
+                variant={scheduleScope === "department" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => setScheduleScope("department")}
+              >
+                部署
+              </Button>
+              <Button
+                type="button"
+                variant={scheduleScope === "overall" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => setScheduleScope("overall")}
+              >
+                全体共有
+              </Button>
+            </div>
+            <div className="flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <Button
+                type="button"
+                variant={view === "timeline" && tlMode === "day" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => {
+                  setView("timeline");
+                  setTlMode("day");
+                }}
+              >
+                日
+              </Button>
+              <Button
+                type="button"
+                variant={view === "week" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => setView("week")}
+              >
+                週
+              </Button>
+              <Button
+                type="button"
+                variant={view === "month" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 rounded-md px-2.5 text-xs sm:px-3"
+                onClick={() => setView("month")}
+              >
+                月
+              </Button>
+            </div>
           </div>
-        )}
-
-          <div className="flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-          <Button
-            type="button"
-            variant={density === "comfortable" ? "secondary" : "ghost"}
-            size="sm"
-              className="h-8 rounded-md"
-            onClick={() => setDensity("comfortable")}
-          >
-            見やすく
-          </Button>
-          <Button
-            type="button"
-            variant={density === "compact" ? "secondary" : "ghost"}
-            size="sm"
-              className="h-8 rounded-md"
-            onClick={() => setDensity("compact")}
-          >
-            たくさん表示
-          </Button>
-        </div>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground shrink-0">
         <Badge variant="outline">表示予定: {filteredSchedules.length}件</Badge>
-        <Badge variant="outline">部署: {activeDepts.size}/{DEPT_KEYS.length}</Badge>
+        <Badge variant="outline">部署: {activeDepts.size}/{BUSINESS_DEPT_KEYS.length}</Badge>
         <Badge variant="outline">
           メンバー: {selectedMemberIds.size === 0 ? "全員" : `${selectedMemberIds.size}名選択`}
         </Badge>
       </div>
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid flex-1 min-h-0 gap-2 grid-cols-[250px_minmax(0,1fr)_260px]">
-          <Card className="w-full min-w-0 overflow-hidden border-slate-200 bg-white shadow-sm">
-            <CardHeader className="py-2 px-3 border-b">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="grid min-h-0 flex-1 grid-cols-[250px_minmax(0,1fr)_260px] items-stretch gap-2">
+          <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
+            <CardHeader className="shrink-0 py-2 px-3 border-b">
               <CardTitle className="text-sm flex items-center gap-1">
                 <Users className="h-4 w-4" />
                 フィルター
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 py-2 px-3">
-              <MiniMonthPicker
-                currentDate={currentDate}
-                onPickDate={(d) => {
-                  setCurrentDate(d);
-                  setSelectedYmd(formatYmd(d));
-                }}
-                onPrevMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()))}
-                onNextMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()))}
-              />
-
-              <div className="flex rounded-md border p-0.5 bg-muted/20">
-                <Button
-                  type="button"
-                  variant={sidebarFilterMode === "department" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 flex-1"
-                  onClick={() => setSidebarFilterMode("department")}
-                >
-                  部署
-                </Button>
-                <Button
-                  type="button"
-                  variant={sidebarFilterMode === "member" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 flex-1"
-                  onClick={() => setSidebarFilterMode("member")}
-                >
-                  メンバー
-                </Button>
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-2 px-3">
+              <div className="shrink-0">
+                <MiniMonthPicker
+                  currentDate={currentDate}
+                  onPickDate={(d) => {
+                    setCurrentDate(d);
+                    setSelectedYmd(formatYmd(d));
+                  }}
+                  onPrevMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()))}
+                  onNextMonth={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()))}
+                />
               </div>
 
-              {sidebarFilterMode === "department" ? (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground">表示部署</p>
-                  <div className="flex gap-1">
-                    <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={activateAllDepts}>
-                      全
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={clearAllDepts}>
-                      解除
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  {DEPT_KEYS.map((k) => (
-                    <label key={`side-${k}`} className="flex items-center gap-2 text-xs py-0.5">
-                      <input type="checkbox" checked={activeDepts.has(k)} onChange={() => toggleDeptFilter(k)} />
-                      <span className="truncate">{DEPT_CONFIG[k].label}</span>
+              <div className="shrink-0 space-y-2">
+                <p className="rounded-md border border-slate-200/80 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                  表示部署
+                </p>
+                <div className="space-y-1.5">
+                  {BUSINESS_DEPT_KEYS.map((k) => (
+                    <label
+                      key={`side-${k}`}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md border border-slate-200/70 bg-white px-2 py-1.5 text-xs shadow-sm transition-colors hover:bg-slate-50/90"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-primary"
+                        checked={activeDepts.has(k)}
+                        onChange={() => toggleDeptFilter(k)}
+                      />
+                      <span
+                        className={cn(
+                          "inline-block h-3 w-3 shrink-0 rounded-full border shadow-sm",
+                          getDeptChipClass(k)
+                        )}
+                      />
+                      <span className="truncate font-medium text-slate-800">{DEPT_CONFIG[k].label}</span>
                     </label>
                   ))}
                 </div>
               </div>
-              ) : (
-              <>
-              <p className="text-xs font-semibold text-muted-foreground">メンバー</p>
-              <Input
-                value={memberQuery}
-                onChange={(e) => setMemberQuery(e.target.value)}
-                placeholder="メンバー検索"
-                className="h-8"
-              />
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setSelectedMemberIds(new Set(filteredMembers.map((m) => m.id)))}
-                >
-                  全選択
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="flex-1" onClick={() => setSelectedMemberIds(new Set())}>
-                  全解除
-                </Button>
-              </div>
-              <div className="max-h-[62vh] overflow-auto pr-1 space-y-1">
-                {filteredMembers.map((m) => (
-                  <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedMemberIds.has(m.id)}
-                      onChange={() =>
-                        setSelectedMemberIds((prev) => {
-                          const n = new Set(prev);
-                          if (n.has(m.id)) n.delete(m.id);
-                          else n.add(m.id);
-                          return n;
-                        })
-                      }
-                    />
-                    <span style={{ color: memberColor(m.id) }} className="truncate">
-                      {m.displayName ?? m.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              </>
-              )}
-              <div className="h-px bg-border my-1" />
-              <div className="space-y-1">
-                <p className="text-[11px] font-medium text-muted-foreground">凡例</p>
-                <div className="grid grid-cols-2 gap-1">
-                  {DEPT_KEYS.map((k) => (
-                    <div key={`legend-${k}`} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span className={cn("inline-block h-2.5 w-2.5 rounded-sm border", getDeptChipClass(k))} />
-                      <span className="truncate">{DEPT_CONFIG[k].label}</span>
-                    </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-2">
+                <p className="shrink-0 rounded-md border border-slate-200/80 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                  メンバー
+                </p>
+                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
+                  {members.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md border border-slate-200/70 bg-white px-2 py-1.5 text-sm shadow-sm transition-colors hover:bg-slate-50/90"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-primary"
+                        checked={selectedMemberIds.has(m.id)}
+                        onChange={() =>
+                          setSelectedMemberIds((prev) => {
+                            const n = new Set(prev);
+                            if (n.has(m.id)) n.delete(m.id);
+                            else n.add(m.id);
+                            return n;
+                          })
+                        }
+                      />
+                      <span style={{ color: memberColor(m.id) }} className="truncate font-medium">
+                        {m.displayName ?? m.name}
+                      </span>
+                    </label>
                   ))}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="min-w-0 min-h-0 overflow-auto rounded-lg border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm">
             {view === "month" && (
               <MonthGridView
                 month={mo}
@@ -1636,11 +1611,11 @@ function CalendarTab() {
             )}
           </div>
 
-          <Card className="min-h-0 overflow-hidden border-slate-200 bg-white shadow-sm">
-            <CardHeader className="py-2 px-3 border-b">
+          <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
+            <CardHeader className="shrink-0 py-2 px-3 border-b">
               <CardTitle className="text-sm">本日の予定</CardTitle>
             </CardHeader>
-            <CardContent className="py-2 px-3 space-y-2 max-h-[72vh] overflow-auto">
+            <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto py-2 px-3 [scrollbar-width:thin]">
               <p className="text-[11px] text-muted-foreground">{selectedYmd}</p>
               {selectedDaySchedules.length === 0 ? (
                 <p className="text-xs text-muted-foreground">予定はありません</p>
@@ -1680,6 +1655,7 @@ function CalendarTab() {
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
 
       {showEventPanel && selectedEvent && popoverAnchor && user && (
         <EventPopover
@@ -1765,7 +1741,12 @@ function CalendarTab() {
               toast.error("終了日時は開始日時より後にしてください");
               return;
             }
-            const dept = formData.scheduleType === "personal" ? "personal" : (formData.department as "maintenance");
+            const dept =
+              formData.scheduleType === "personal"
+                ? "personal"
+                : isBusinessDeptKey(formData.department)
+                  ? formData.department
+                  : DEFAULT_FORM_DEPT;
             createMutation.mutate({
               title: formData.title.trim(),
               description: formData.description || null,
@@ -1872,14 +1853,14 @@ function MonthGridView({
 }) {
   const todayYmd = formatYmd(new Date());
 
-  const cellMinHeight = density === "compact" ? "min-h-[108px]" : "min-h-[132px]";
-  const cellInnerMinHeight = density === "compact" ? "min-h-[96px]" : "min-h-[120px]";
+  const cellMinHeight = density === "compact" ? "min-h-[100px]" : "min-h-[118px]";
+  const cellInnerMinHeight = density === "compact" ? "min-h-[88px]" : "min-h-[106px]";
   const visibleEventCount = density === "compact" ? 3 : 2;
 
   return (
     <div className="grid grid-cols-7 border-t border-l border-slate-200/70">
       {WEEKDAY_LABELS.map((w) => (
-        <div key={w} className="bg-slate-50 text-center text-xs py-2 font-medium border-r border-b border-slate-200/70">
+        <div key={w} className="bg-slate-50 py-1.5 text-center text-xs font-medium border-r border-b border-slate-200/70">
           {w}
         </div>
       ))}
@@ -1934,7 +1915,7 @@ function MonthGridView({
                       className={cn(
                         getDeptChipClass(ev.scheduleDepartment),
                         getDeptAccentClass(ev.scheduleDepartment),
-                        "border-l-4 min-h-[28px] px-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
+                        "border-l-4 min-h-[26px] px-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
                       )}
                     >
                       <span onClick={(e) => { e.stopPropagation(); onEventClick(ev, e); }} className="truncate">
@@ -2122,14 +2103,14 @@ function TimelineView({
     const ymd = formatYmd(currentDate);
     const hours = Array.from({ length: 24 }, (_, h) => h);
     return (
-      <div className="overflow-x-auto">
-        {DEPT_KEYS.map((dept) => {
+      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        {BUSINESS_DEPT_KEYS.map((dept) => {
           if (collapsedDepts.has(dept)) {
             return (
               <button
                 key={dept}
                 type="button"
-                className="flex w-full border-b py-1 px-2 text-left text-sm bg-muted/30"
+                className="flex w-full border-b border-slate-200 py-1.5 px-2 text-left text-sm bg-muted/30"
                 style={{ paddingLeft: LABEL_W }}
                 onClick={() => toggleCollapsed(dept)}
               >
@@ -2137,25 +2118,35 @@ function TimelineView({
               </button>
             );
           }
-          const deptEvents = filteredSchedules.filter(
-            (s) => (s.scheduleDepartment ?? "all") === dept && formatYmd(s.startAt) <= ymd && ymd <= formatYmd(s.endAt)
-          );
+          const deptEvents = filteredSchedules.filter((s) => {
+            const sd = s.scheduleDepartment ?? "all";
+            if (formatYmd(s.startAt) > ymd || formatYmd(s.endAt) < ymd) return false;
+            if (sd === dept) return true;
+            if (sd === "all" && dept === DEFAULT_FORM_DEPT) return true;
+            return false;
+          });
           return (
-            <div key={dept} className="border-b">
-              <button
-                type="button"
-                className="flex items-center gap-2 py-1 px-2 text-sm font-medium bg-muted/20 w-full text-left"
-                onClick={() => toggleCollapsed(dept)}
-              >
-                <span className="shrink-0 text-xs w-[160px] pl-2">▼ {DEPT_CONFIG[dept].label}</span>
-                <div className="flex flex-1 relative h-14">
+            <div key={dept} className="border-b border-slate-200">
+              <div className="flex min-w-max items-stretch">
+                <button
+                  type="button"
+                  className="sticky left-0 z-[1] flex w-[160px] shrink-0 items-center border-r border-slate-200 bg-muted/30 py-2 pl-2 text-left text-xs font-medium text-slate-800"
+                  onClick={() => toggleCollapsed(dept)}
+                >
+                  ▼ {DEPT_CONFIG[dept].label}
+                </button>
+                <div className="relative inline-flex h-[4.25rem] items-stretch">
                   {hours.map((h) => (
                     <DroppableCell
                       key={h}
                       id={`tl-day-${dept}-${ymd}-${h}`}
-                      className="flex-1 border-l border-dashed border-muted min-h-[56px]"
+                      className="w-11 shrink-0 border-l border-dashed border-muted/60 first:border-l-0"
                     >
-                      <button type="button" className="w-full h-full text-[10px] text-muted-foreground" onClick={() => onCellClick(ymd)}>
+                      <button
+                        type="button"
+                        className="flex h-full w-full flex-col justify-start pt-0.5 text-center text-[10px] leading-none text-muted-foreground"
+                        onClick={() => onCellClick(ymd)}
+                      >
                         {h}
                       </button>
                     </DroppableCell>
@@ -2164,25 +2155,27 @@ function TimelineView({
                     const sh = ev.startAt.getHours();
                     const eh = ev.endAt.getHours();
                     const left = (sh / 24) * 100;
-                    const width = Math.max(((Math.min(eh + 1, 24) - sh) / 24) * 100, 4);
-                    const cfg = DEPT_CONFIG[(ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG] ?? DEPT_CONFIG.all;
+                    const width = Math.max(((Math.min(eh + 1, 24) - sh) / 24) * 100, 3);
+                    const cfg =
+                      DEPT_CONFIG[(ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG] ?? DEPT_CONFIG.all;
                     return (
                       <div
-                        key={ev.id}
-                        className="absolute top-1 h-10 rounded border text-[10px] px-1 truncate pointer-events-none"
+                        key={`${dept}-${ev.id}`}
+                        className={cn(
+                          "pointer-events-none absolute top-1.5 h-[2.65rem] overflow-hidden rounded border border-white/30 px-1 text-[10px] font-medium leading-tight text-white shadow-sm",
+                          cfg.bg
+                        )}
                         style={{
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          background: "rgba(59,130,246,.85)",
-                          color: "#fff",
+                          left: `calc(${left}% + 2px)`,
+                          width: `calc(${width}% - 4px)`,
                         }}
                       >
-                        {ev.title}
+                        <span className="line-clamp-2">{ev.title}</span>
                       </div>
                     );
                   })}
                 </div>
-              </button>
+              </div>
             </div>
           );
         })}
@@ -2393,13 +2386,24 @@ function CreateFormModal({
     title: string;
     description: string;
     scheduleType: "department" | "personal";
-    department: string;
+    department: BusinessDeptKey;
     startAt: string;
     endAt: string;
     allDay: boolean;
     color: string;
   };
-  setFormData: React.Dispatch<React.SetStateAction<(typeof formData)>>;
+  setFormData: React.Dispatch<
+    React.SetStateAction<{
+      title: string;
+      description: string;
+      scheduleType: "department" | "personal";
+      department: BusinessDeptKey;
+      startAt: string;
+      endAt: string;
+      allDay: boolean;
+      color: string;
+    }>
+  >;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -2424,7 +2428,16 @@ function CreateFormModal({
               className="w-full border rounded-md h-9 px-2 text-sm bg-background"
               value={formData.scheduleType}
               onChange={(e) =>
-                setFormData((p) => ({ ...p, scheduleType: e.target.value as "department" | "personal" }))
+                setFormData((p) => {
+                  const scheduleType = e.target.value as "department" | "personal";
+                  if (scheduleType === "personal") return { ...p, scheduleType };
+                  const dept = p.department;
+                  return {
+                    ...p,
+                    scheduleType,
+                    department: isBusinessDeptKey(dept) ? dept : DEFAULT_FORM_DEPT,
+                  };
+                })
               }
             >
               <option value="department">部署</option>
@@ -2437,9 +2450,11 @@ function CreateFormModal({
               <select
                 className="w-full border rounded-md h-9 px-2 text-sm bg-background"
                 value={formData.department}
-                onChange={(e) => setFormData((p) => ({ ...p, department: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, department: e.target.value as BusinessDeptKey }))
+                }
               >
-                {DEPT_KEYS.map((k) => (
+                {BUSINESS_DEPT_KEYS.map((k) => (
                   <option key={k} value={k}>
                     {DEPT_CONFIG[k].label}
                   </option>
