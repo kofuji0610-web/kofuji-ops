@@ -19,6 +19,7 @@ import {
   Paintbrush,
   Plane,
   Scissors,
+  UserCircle,
   Users,
   Wrench,
   X,
@@ -1557,17 +1558,23 @@ function CalendarTab() {
                           })
                         }
                         className={cn(
-                          "flex w-full min-w-0 items-center rounded-md px-1 py-0.5 text-left text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
+                          "flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
                           memberOn ? "font-semibold shadow-md" : "shadow-sm hover:brightness-[0.97]"
                         )}
                         style={{
                           backgroundColor: memberOn ? `${deptHex}48` : `${deptHex}22`,
                           border: memberOn
-                            ? `2px solid ${deptHex}`
-                            : `1px solid rgba(203, 213, 225, 0.55)`,
+                            ? `1px solid ${deptHex}9E`
+                            : `1px solid ${deptHex}52`,
                           boxShadow: memberOn ? "0 1px 4px rgba(15, 23, 42, 0.07)" : undefined,
                         }}
                       >
+                        <span
+                          className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.65)]"
+                          aria-hidden
+                        >
+                          <UserCircle className="h-3 w-3 text-slate-500" aria-hidden />
+                        </span>
                         <span className="min-w-0 truncate">{m.displayName ?? m.name}</span>
                       </button>
                     );
