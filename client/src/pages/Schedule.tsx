@@ -78,19 +78,6 @@ function normalizeActiveDeptsPref(saved?: string[]): Set<string> {
 
 type ScheduleScopeTab = "personal" | "department" | "overall";
 
-const MEMBER_COLORS = [
-  "#60A5FA",
-  "#4ADE80",
-  "#FCD34D",
-  "#A78BFA",
-  "#F9A8D4",
-  "#67E8F9",
-  "#FCA5A5",
-  "#6EE7B7",
-  "#FDE68A",
-  "#C4B5FD",
-];
-
 const TASK_TYPES_BY_DEPT: Record<string, string[]> = {
   maintenance: ["点検", "オイル交換", "タイヤ交換・点検", "ブレーキ整備", "エンジン整備", "車体修理", "洗車", "打合せ", "その他"],
   painting: ["下処理", "塗装", "清掃", "デザイン", "打合せ", "その他"],
@@ -1210,8 +1197,6 @@ function CalendarTab() {
     [filteredSchedules]
   );
 
-  const memberColor = useCallback((userId: number) => MEMBER_COLORS[userId % MEMBER_COLORS.length], []);
-
   const handleDragStart = useCallback(
     (e: DragStartEvent) => {
       const id = String(e.active.id);
@@ -1554,6 +1539,10 @@ function CalendarTab() {
                 <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
                   {members.map((m) => {
                     const memberOn = selectedMemberIds.has(m.id);
+                    const deptHex =
+                      (m.department
+                        ? DEPT_CONFIG[m.department as keyof typeof DEPT_CONFIG]?.color
+                        : undefined) ?? DEPT_CONFIG.all.color;
                     return (
                       <button
                         key={m.id}
@@ -1568,20 +1557,18 @@ function CalendarTab() {
                           })
                         }
                         className={cn(
-                          "flex w-full min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs shadow-sm transition-colors",
-                          memberOn
-                            ? "border-transparent bg-primary/15 font-medium text-slate-900 ring-1 ring-primary/25"
-                            : "border-slate-200/80 bg-white text-slate-700 hover:bg-slate-50/90"
+                          "flex w-full min-w-0 items-center rounded-md px-1 py-0.5 text-left text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
+                          memberOn ? "font-semibold shadow-md" : "shadow-sm hover:brightness-[0.97]"
                         )}
+                        style={{
+                          backgroundColor: memberOn ? `${deptHex}48` : `${deptHex}22`,
+                          border: memberOn
+                            ? `2px solid ${deptHex}`
+                            : `1px solid rgba(203, 213, 225, 0.55)`,
+                          boxShadow: memberOn ? "0 1px 4px rgba(15, 23, 42, 0.07)" : undefined,
+                        }}
                       >
-                        <span
-                          className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/5"
-                          style={{ backgroundColor: memberColor(m.id) }}
-                          aria-hidden
-                        />
-                        <span className="truncate" style={{ color: memberColor(m.id) }}>
-                          {m.displayName ?? m.name}
-                        </span>
+                        <span className="min-w-0 truncate">{m.displayName ?? m.name}</span>
                       </button>
                     );
                   })}
