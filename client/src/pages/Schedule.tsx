@@ -2471,7 +2471,7 @@ function DepartmentWeekGridView({
                     key={`dwk-${ymd}-${dept}`}
                     id={`week-${ymd}-${DEPT_WEEK_DROP_ID_NUM[dk]}`}
                     className={cn(
-                      "relative flex min-h-0 min-w-0 flex-col gap-1 overflow-x-hidden overflow-y-auto p-1 [scrollbar-width:thin]",
+                      "group relative flex min-h-0 min-w-0 flex-col gap-1 overflow-x-hidden overflow-y-auto p-1 [scrollbar-width:thin]",
                       hol && "bg-pink-50",
                       !hol && sat && "bg-sky-50",
                       "hover:bg-muted/20 transition-colors",
@@ -2485,7 +2485,7 @@ function DepartmentWeekGridView({
                     {list.length === 0 && (
                       <button
                         type="button"
-                        className="absolute right-1 top-1 text-[10px] text-muted-foreground hover:text-foreground"
+                        className="absolute right-1 top-1 text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => onCellClick(ymd)}
                         aria-label="予定を追加"
                       >
