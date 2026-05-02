@@ -1084,6 +1084,8 @@ function CalendarTab() {
   const isDraggingRef = useRef(false);
   const [dragEvent, setDragEvent] = useState<ScheduleRow | null>(null);
   const [dayListYmd, setDayListYmd] = useState<string | null>(null);
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [selectedYmd, setSelectedYmd] = useState<string>(() => formatYmd(new Date()));
 
   const rangeInput = useMemo(() => {
@@ -1524,6 +1526,29 @@ function CalendarTab() {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 lg:hidden shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            setShowLeftPanel((v) => !v);
+            setShowRightPanel(false);
+          }}
+          className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm"
+        >
+          フィルター
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowRightPanel((v) => !v);
+            setShowLeftPanel(false);
+          }}
+          className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm"
+        >
+          本日の予定
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground shrink-0">
         <Badge variant="outline">表示予定: {filteredSchedules.length}件</Badge>
         <Badge variant="outline">部署: {activeDepts.size}/{BUSINESS_DEPT_KEYS.length}</Badge>
@@ -1536,11 +1561,25 @@ function CalendarTab() {
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div
             className={cn(
-              "grid min-h-0 grid-cols-[220px_minmax(0,1fr)_228px] items-stretch gap-1.5",
+              "grid min-h-0 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_228px] items-stretch gap-1.5",
               deptWeekFill && "flex-1 min-h-0"
             )}
           >
-          <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
+          <>
+            {showLeftPanel && (
+              <div
+                className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+                onClick={() => setShowLeftPanel(false)}
+              />
+            )}
+            <Card
+              className={cn(
+                "h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm",
+                "hidden lg:flex",
+                showLeftPanel &&
+                  "fixed left-0 top-0 z-50 flex h-full w-[280px] rounded-none lg:static lg:z-auto lg:h-full lg:w-full lg:rounded-lg"
+              )}
+            >
             <CardHeader className="shrink-0 py-1.5 px-2 border-b">
               <CardTitle className="text-sm flex items-center gap-1">
                 <Users className="h-4 w-4" />
@@ -1648,6 +1687,7 @@ function CalendarTab() {
               </div>
             </CardContent>
           </Card>
+          </>
 
           <div
             className={cn(
@@ -1761,7 +1801,21 @@ function CalendarTab() {
             )}
           </div>
 
-          <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
+          <>
+            {showRightPanel && (
+              <div
+                className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+                onClick={() => setShowRightPanel(false)}
+              />
+            )}
+            <Card
+              className={cn(
+                "h-full min-h-0 min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm",
+                "hidden lg:flex",
+                showRightPanel &&
+                  "fixed right-0 top-0 z-50 flex h-full w-[280px] rounded-none lg:static lg:z-auto lg:h-full lg:w-auto lg:rounded-lg"
+              )}
+            >
             <CardHeader className="shrink-0 py-2 px-3 border-b">
               <CardTitle className="text-sm">本日の予定</CardTitle>
             </CardHeader>
@@ -1789,6 +1843,7 @@ function CalendarTab() {
               )}
             </CardContent>
           </Card>
+          </>
         </div>
 
         <DragOverlay>
