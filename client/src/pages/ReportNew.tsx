@@ -3053,7 +3053,7 @@ export default function ReportNew() {
                           {/* カテゴリ */}
                           <div className="space-y-1.5">
                             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Wrench className="w-3 h-3" />整備部位カテゴリ *</p>
-                            <div className="grid grid-cols-3 gap-1.5">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                               {MAINTENANCE_CATEGORIES.map((cat) => (
                                 <button
                                   key={cat}
@@ -3663,7 +3663,7 @@ export default function ReportNew() {
                   {/* K) 車両総合判定 */}
                   <div className="rounded-md border-2 border-stone-300 bg-slate-50 p-2.5 space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><ShieldCheck className="w-3 h-3" />車両総合判定</p>
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {OVERALL_JUDGMENT_OPTIONS.map((opt) => (
                         <button
                           key={opt.value}
