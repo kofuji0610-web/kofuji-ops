@@ -171,13 +171,16 @@ export function OverallDayMatrixView({
     return m.displayName?.trim() || m.name;
   }
 
-  const gridCols = `minmax(7rem,9rem) repeat(24, minmax(0,1fr))`;
+  const gridCols = `minmax(6rem,7rem) repeat(24, minmax(0,1fr))`;
+  const deptRowsCount = visibleDeptKeys.length;
+  const memberRowsCount = rows.filter((r) => r.kind === "member").length;
+  const gridRows = `auto repeat(${deptRowsCount}, 36px) repeat(${memberRowsCount}, minmax(0, 1fr))`;
 
   return (
-    <div className="max-h-[70vh] overflow-y-auto rounded-md border border-slate-200 bg-white [scrollbar-width:thin]">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto rounded-md border border-slate-200 bg-white [scrollbar-width:thin]">
       <div
-        className="grid w-full min-w-0 gap-px bg-slate-200 text-xs"
-        style={{ gridTemplateColumns: gridCols }}
+        className="grid w-full min-h-0 min-w-0 flex-1 gap-px bg-slate-200 text-xs"
+        style={{ gridTemplateColumns: gridCols, gridTemplateRows: gridRows }}
       >
         {/* ヘッダー行 */}
         <div className="sticky top-0 z-10 bg-slate-100 px-2 py-1 font-semibold text-slate-700"> </div>
