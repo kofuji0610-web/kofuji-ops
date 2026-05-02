@@ -1409,8 +1409,15 @@ function CalendarTab() {
     window.localStorage.setItem(CALENDAR_PREFS_KEY, JSON.stringify(prefs));
   }, [view, tlMode, density, scheduleScope, activeDepts, selectedMemberIds]);
 
+  const deptWeekFill = view === "week" && scheduleScope === "department";
+
   return (
-    <div className="flex min-h-min w-full flex-col gap-2 p-3 pb-10 bg-slate-100/70">
+    <div
+      className={cn(
+        "flex w-full flex-col gap-2 p-3 pb-10 bg-slate-100/70",
+        deptWeekFill ? "min-h-0 flex-1" : "min-h-min"
+      )}
+    >
       <div className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
         <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="min-w-[160px]">
@@ -1525,9 +1532,14 @@ function CalendarTab() {
         </Badge>
       </div>
 
-      <div className="flex min-h-0 flex-col">
+      <div className={cn("flex min-h-0 flex-col", deptWeekFill && "flex-1 min-h-0")}>
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)_228px] items-stretch gap-1.5">
+          <div
+            className={cn(
+              "grid min-h-0 grid-cols-[220px_minmax(0,1fr)_228px] items-stretch gap-1.5",
+              deptWeekFill && "flex-1 min-h-0"
+            )}
+          >
           <Card className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-slate-200 bg-white shadow-sm">
             <CardHeader className="shrink-0 py-1.5 px-2 border-b">
               <CardTitle className="text-sm flex items-center gap-1">
@@ -1637,12 +1649,18 @@ function CalendarTab() {
             </CardContent>
           </Card>
 
-          <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-auto rounded-lg border border-slate-200/80 bg-white shadow-sm">
+          <div
+            className={cn(
+              "flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200/80 bg-white shadow-sm",
+              deptWeekFill ? "overflow-x-hidden" : "overflow-x-auto"
+            )}
+          >
             {view === "month" && (
               <MonthGridView
                 month={mo}
                 cells={monthGrid}
                 density={density}
+                scheduleScope={scheduleScope}
                 eventsForDay={eventsForDay}
                 onCellClick={openCreateForDay}
                 onDaySelect={(ymd) => setSelectedYmd(ymd)}
@@ -1676,19 +1694,21 @@ function CalendarTab() {
                   }}
                 />
               ) : scheduleScope === "department" ? (
-                <DepartmentWeekGridView
-                  weekDays={weekDays}
-                  activeDepts={activeDepts}
-                  filteredSchedules={filteredSchedules}
-                  density={density}
-                  onCellClick={openCreateForDay}
-                  onEventClick={(ev, e) => {
-                    if (isDraggingRef.current) return;
-                    setSelectedEvent(ev);
-                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                    setShowEventPanel(true);
-                  }}
-                />
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+                  <DepartmentWeekGridView
+                    weekDays={weekDays}
+                    activeDepts={activeDepts}
+                    filteredSchedules={filteredSchedules}
+                    density={density}
+                    onCellClick={openCreateForDay}
+                    onEventClick={(ev, e) => {
+                      if (isDraggingRef.current) return;
+                      setSelectedEvent(ev);
+                      setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                      setShowEventPanel(true);
+                    }}
+                  />
+                </div>
               ) : (
                 <WeekMemberMatrixView
                   weekDays={weekDays}
@@ -1970,10 +1990,20 @@ function monthEventColorKey(ev: ScheduleRow): string | null | undefined {
   return ev.scheduleDepartment;
 }
 
+function departmentMonthChipIcon(sd: string | null | undefined) {
+  const raw = sd ?? "all";
+  const key =
+    raw === "all" || !isBusinessDeptKey(raw)
+      ? DEFAULT_FORM_DEPT
+      : (raw as keyof typeof DEPT_FILTER_ICON_COMPONENTS);
+  return DEPT_FILTER_ICON_COMPONENTS[key];
+}
+
 function MonthGridView({
   month,
   cells,
   density,
+  scheduleScope,
   eventsForDay,
   onCellClick,
   onDaySelect,
@@ -1984,6 +2014,7 @@ function MonthGridView({
   month: number;
   cells: Date[];
   density: "comfortable" | "compact";
+  scheduleScope: ScheduleScopeTab;
   eventsForDay: (ymd: string) => ScheduleRow[];
   onCellClick: (ymd: string) => void;
   onDaySelect: (ymd: string) => void;
@@ -1998,7 +2029,7 @@ function MonthGridView({
   const visibleEventCount = density === "compact" ? 3 : 2;
 
   return (
-    <div className="grid grid-cols-7 border-t border-l border-slate-200/70">
+    <div className="grid w-full min-w-0 max-w-full grid-cols-7 overflow-x-hidden border-t border-l border-slate-200/70">
       {WEEKDAY_LABELS.map((w) => (
         <div key={w} className="bg-slate-50 py-1.5 text-center text-xs font-medium border-r border-b border-slate-200/70">
           {w}
@@ -2045,9 +2076,43 @@ function MonthGridView({
                 </span>
                 {holidayName && <span className="text-[9px] text-pink-700 truncate max-w-[56px]">{holidayName}</span>}
               </div>
-              <div className="flex-1 flex flex-col gap-1 mt-1 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-1 mt-1 min-h-0 overflow-hidden">
                 {list.slice(0, visibleEventCount).map((ev) => {
-                  const colorKey = monthEventColorKey(ev);
+                  const colorKey =
+                    scheduleScope === "department"
+                      ? (ev.scheduleDepartment ?? "all")
+                      : monthEventColorKey(ev);
+                  if (scheduleScope === "department") {
+                    const DeptIcon = departmentMonthChipIcon(ev.scheduleDepartment);
+                    return (
+                      <DraggableEventChip
+                        key={ev.id}
+                        id={`event-${ev.id}`}
+                        dense={false}
+                        className={cn(
+                          getDeptChipClass(colorKey),
+                          getDeptAccentClass(colorKey),
+                          "border-l-4 min-h-[26px] max-w-full min-w-0 overflow-hidden px-1.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
+                        )}
+                      >
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(ev, e);
+                          }}
+                          className="flex min-w-0 max-w-full items-start gap-0.5 overflow-hidden"
+                        >
+                          <DeptIcon className="mt-0.5 h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                          <span className="min-w-0 flex-1 overflow-hidden leading-tight">
+                            <span className="block truncate text-[10px] opacity-90">
+                              {ev.allDay ? "終日" : formatHm(ev.startAt)}
+                            </span>
+                            <span className="block truncate text-[11px] font-semibold">{ev.title}</span>
+                          </span>
+                        </span>
+                      </DraggableEventChip>
+                    );
+                  }
                   return (
                     <DraggableEventChip
                       key={ev.id}
@@ -2346,7 +2411,7 @@ function DepartmentWeekGridView({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="flex h-full min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden rounded-md border border-slate-200 bg-white">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="z-30 shrink-0 border-b border-slate-200 bg-white">
           <div className="grid w-full bg-muted/30" style={{ gridTemplateColumns }}>
@@ -3162,7 +3227,10 @@ export default function SchedulePage() {
           <TabsTrigger value="hours">工数管理</TabsTrigger>
           <TabsTrigger value="notification">通知設定</TabsTrigger>
         </TabsList>
-        <TabsContent value="calendar" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden mt-0 data-[state=inactive]:hidden">
+        <TabsContent
+          value="calendar"
+          className="mt-0 flex flex-1 min-h-0 flex-col overflow-y-auto overflow-x-hidden data-[state=inactive]:hidden"
+        >
           <CalendarTab />
         </TabsContent>
         <TabsContent value="shift" className="flex-1 overflow-auto p-4 mt-0 data-[state=inactive]:hidden">
