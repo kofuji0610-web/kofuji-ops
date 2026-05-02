@@ -48,6 +48,7 @@ import {
   startOfLocalDay,
 } from "@/components/schedule/PersonalDayView";
 import { canEditScheduleOf } from "@/utils/schedulePermission";
+import { OverallDayMatrixView } from "@/components/schedule/OverallDayMatrixView";
 
 // ─── 定数（全タブ共通） ───────────────────────────────────────────────────────
 
@@ -1770,6 +1771,21 @@ function CalendarTab() {
                   schedules={filteredSchedules}
                   currentDate={currentDate}
                   user={{ id: user.id, department: user.department }}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev as ScheduleRow);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              ) : scheduleScope === "overall" && tlMode === "day" ? (
+                <OverallDayMatrixView
+                  schedules={filteredSchedules}
+                  currentDate={currentDate}
+                  members={
+                    members as unknown as import("@/components/schedule/OverallDayMatrixView").OverallDayMatrixMember[]
+                  }
+                  activeDepts={activeDepts}
                   onEventClick={(ev, e) => {
                     if (isDraggingRef.current) return;
                     setSelectedEvent(ev as ScheduleRow);
