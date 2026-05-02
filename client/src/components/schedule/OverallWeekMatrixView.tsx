@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
 import { Wrench, Paintbrush, Scissors, Plane } from "lucide-react";
+import * as holidayJp from "@holiday-jp/holiday_jp";
+import { cn } from "@/lib/utils";
 
 /** スケジュール画面「全体共有 × 週表示」用 */
 const BUSINESS_DEPT_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
@@ -25,6 +27,23 @@ const DEPT_COLOR_MAP = {
   slitter: "#FCD34D",
   drone: "#A78BFA",
 } as const;
+
+function isHolidayOrSunday(d: Date): boolean {
+  if (d.getDay() === 0) return true;
+  return holidayJp.isHoliday(d);
+}
+
+function getHolidayName(d: Date): string | null {
+  const holiday = holidayJp.isHoliday(d) as unknown;
+  if (!holiday || typeof holiday !== "object") return null;
+  if (!("name" in holiday)) return null;
+  const name = (holiday as { name?: unknown }).name;
+  return typeof name === "string" ? name : null;
+}
+
+function isSaturday(d: Date): boolean {
+  return d.getDay() === 6;
+}
 
 const ALL_DEPT_FALLBACK: BusinessDeptKey = BUSINESS_DEPT_KEYS[0];
 
@@ -141,6 +160,8 @@ export function OverallWeekMatrixView({
   activeDepts,
   onEventClick,
 }: OverallWeekMatrixViewProps) {
+  const todayYmd = formatYmd(new Date());
+
   const visibleDeptKeys = useMemo(
     () => BUSINESS_DEPT_KEYS.filter((k) => activeDepts.has(k)),
     [activeDepts]
@@ -189,13 +210,26 @@ export function OverallWeekMatrixView({
       >
         <div className="sticky top-0 z-10 bg-slate-100 px-2 py-1 font-semibold text-slate-700"> </div>
         {weekDays.map((d) => {
+          const ymdH = formatYmd(d);
           const wd = WEEKDAY_JP[d.getDay()];
+          const hol = isHolidayOrSunday(d);
+          const sat = isSaturday(d);
+          const isToday = ymdH === todayYmd;
+          const holidayName = getHolidayName(d);
           return (
             <div
-              key={formatYmd(d)}
-              className="sticky top-0 z-10 bg-slate-100 px-0.5 py-1 text-center font-medium text-[10px] text-slate-600"
+              key={ymdH}
+              className={cn(
+                "sticky top-0 z-10 px-0.5 py-1 text-center font-medium text-[10px] text-slate-600",
+                hol && "bg-pink-50",
+                !hol && sat && "bg-sky-50",
+                isToday && "bg-primary/10",
+                !hol && !sat && !isToday && "bg-slate-100"
+              )}
             >
-              {wd} {d.getDate()}
+              <div className="text-[11px] text-muted-foreground tracking-wide">{wd}</div>
+              <div className={cn("text-base font-semibold leading-tight", isToday && "text-primary")}>{d.getDate()}</div>
+              {holidayName && <div className="text-[9px] text-pink-700 truncate">{holidayName}</div>}
             </div>
           );
         })}
@@ -231,6 +265,9 @@ export function OverallWeekMatrixView({
               <div className="flex min-h-[2.25rem] items-center bg-white px-2 py-1">{label}</div>
               {weekDays.map((d) => {
                 const ymd = formatYmd(d);
+                const hol = isHolidayOrSunday(d);
+                const sat = isSaturday(d);
+                const isTodayCell = ymd === todayYmd;
                 const evts = eventsForCell(row, ymd);
                 const visible = evts.slice(0, MAX_VISIBLE_EVENTS);
                 const rest = evts.length - visible.length;
@@ -238,7 +275,13 @@ export function OverallWeekMatrixView({
                 return (
                   <div
                     key={`${ymd}-${ri}`}
-                    className="min-h-[2.25rem] min-w-0 border-l border-slate-100 bg-white px-0.5 py-0.5 align-top"
+                    className={cn(
+                      "min-h-[2.25rem] min-w-0 border-l border-slate-100 px-0.5 py-0.5 align-top",
+                      hol && "bg-pink-50",
+                      !hol && sat && "bg-sky-50",
+                      isTodayCell && "bg-primary/10",
+                      !hol && !sat && !isTodayCell && "bg-white"
+                    )}
                   >
                     <div className="flex max-h-28 flex-col gap-0.5 overflow-hidden">
                       {visible.map((ev) => (
