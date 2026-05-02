@@ -2092,7 +2092,7 @@ function MonthGridView({
                         className={cn(
                           getDeptChipClass(colorKey),
                           getDeptAccentClass(colorKey),
-                          "border-l-4 min-h-[26px] max-w-full min-w-0 overflow-hidden px-1.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
+                          "border-l-4 max-w-full min-w-0 min-h-[22px] overflow-hidden px-1 py-0.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-md"
                         )}
                       >
                         <span
@@ -2100,14 +2100,13 @@ function MonthGridView({
                             e.stopPropagation();
                             onEventClick(ev, e);
                           }}
-                          className="flex min-w-0 max-w-full items-start gap-0.5 overflow-hidden"
+                          className="flex min-w-0 max-w-full items-center gap-0.5 overflow-hidden"
                         >
-                          <DeptIcon className="mt-0.5 h-3 w-3 shrink-0 opacity-90" aria-hidden />
-                          <span className="min-w-0 flex-1 overflow-hidden leading-tight">
-                            <span className="block truncate text-[10px] opacity-90">
-                              {ev.allDay ? "終日" : formatHm(ev.startAt)}
-                            </span>
-                            <span className="block truncate text-[11px] font-semibold">{ev.title}</span>
+                          <DeptIcon className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                          <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[10px] leading-tight">
+                            <span className="tabular-nums opacity-90">{ev.allDay ? "終日" : formatHm(ev.startAt)}</span>
+                            <span className="mx-0.5 font-semibold opacity-90">·</span>
+                            <span className="font-semibold">{ev.title}</span>
                           </span>
                         </span>
                       </DraggableEventChip>
