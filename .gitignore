@@ -25,3 +25,6 @@ npm-debug.log*
 
 # Drizzle
 migrations/
+
+# ローカル作業用バックアップディレクトリ
+.backup-*/
