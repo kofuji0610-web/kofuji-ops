@@ -36,7 +36,17 @@ import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths } from "date-fns";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
-import { PersonalDayView } from "@/components/schedule/PersonalDayView";
+import {
+  PersonalDayView,
+  ScheduleDayTimeLabelsColumn,
+  ScheduleDayTimeGridColumn,
+  SCHEDULE_DAY_TIME_AXIS_WIDTH_PX,
+  PIXELS_PER_HOUR,
+  clipTimedSegmentToDay,
+  endOfLocalDay,
+  segmentLayout,
+  startOfLocalDay,
+} from "@/components/schedule/PersonalDayView";
 import { canEditScheduleOf } from "@/utils/schedulePermission";
 
 // ─── 定数（全タブ共通） ───────────────────────────────────────────────────────
@@ -1694,6 +1704,7 @@ function CalendarTab() {
                   weekDays={weekDays}
                   collapsedDepts={collapsedDepts}
                   toggleCollapsed={toggleCollapsed}
+                  activeDepts={activeDepts}
                   filteredSchedules={filteredSchedules}
                   eventsForDay={eventsForDay}
                   onCellClick={openCreateForDay}
@@ -2409,6 +2420,7 @@ function TimelineView({
   weekDays,
   collapsedDepts,
   toggleCollapsed,
+  activeDepts,
   filteredSchedules,
   eventsForDay,
   onCellClick,
@@ -2421,6 +2433,7 @@ function TimelineView({
   weekDays: Date[];
   collapsedDepts: Set<string>;
   toggleCollapsed: (k: string) => void;
+  activeDepts: Set<string>;
   filteredSchedules: ScheduleRow[];
   eventsForDay: (ymd: string) => ScheduleRow[];
   onCellClick: (ymd: string) => void;
@@ -2428,84 +2441,193 @@ function TimelineView({
 }) {
   if (tlMode === "day") {
     const ymd = formatYmd(currentDate);
+    const dayStart = startOfLocalDay(currentDate);
+    const dayEnd = endOfLocalDay(currentDate);
     const hours = Array.from({ length: 24 }, (_, h) => h);
+
+    const deptEventsFor = (dept: string) =>
+      filteredSchedules.filter((s) => {
+        const sd = s.scheduleDepartment ?? "all";
+        if (formatYmd(s.startAt) > ymd || formatYmd(s.endAt) < ymd) return false;
+        if (sd === dept) return true;
+        if (sd === "all" && dept === DEFAULT_FORM_DEPT) return true;
+        return false;
+      });
+
+    const visibleDepts = BUSINESS_DEPT_KEYS.filter((k) => activeDepts.has(k));
+    const n = visibleDepts.length;
+    const tw = SCHEDULE_DAY_TIME_AXIS_WIDTH_PX;
+    const gridTemplateColumns =
+      n <= 4
+        ? `${tw}px repeat(${n}, minmax(0, 1fr))`
+        : `${tw}px repeat(${n}, minmax(120px, 1fr))`;
+
+    let hasAnyAllDay = false;
+    for (const dept of visibleDepts) {
+      for (const ev of deptEventsFor(dept)) {
+        if (ev.allDay) {
+          hasAnyAllDay = true;
+          break;
+        }
+      }
+      if (hasAnyAllDay) break;
+    }
+
+    if (visibleDepts.length === 0) {
+      return <div className="min-h-[160px] rounded-md border border-slate-200 bg-white" />;
+    }
+
+    const deptColBorder = (i: number) => (i > 0 ? "border-l border-slate-200" : "");
+
     return (
-      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-        {BUSINESS_DEPT_KEYS.map((dept) => {
-          if (collapsedDepts.has(dept)) {
-            return (
-              <button
-                key={dept}
-                type="button"
-                className="flex w-full border-b border-slate-200 py-1.5 px-2 text-left text-sm bg-muted/30"
-                style={{ paddingLeft: LABEL_W }}
-                onClick={() => toggleCollapsed(dept)}
-              >
-                ▶ {DEPT_CONFIG[dept].label}
-              </button>
-            );
-          }
-          const deptEvents = filteredSchedules.filter((s) => {
-            const sd = s.scheduleDepartment ?? "all";
-            if (formatYmd(s.startAt) > ymd || formatYmd(s.endAt) < ymd) return false;
-            if (sd === dept) return true;
-            if (sd === "all" && dept === DEFAULT_FORM_DEPT) return true;
-            return false;
-          });
-          return (
-            <div key={dept} className="border-b border-slate-200">
-              <div className="flex min-w-max items-stretch">
-                <button
-                  type="button"
-                  className="sticky left-0 z-[1] flex w-[160px] shrink-0 items-center border-r border-slate-200 bg-muted/30 py-2 pl-2 text-left text-xs font-medium text-slate-800"
-                  onClick={() => toggleCollapsed(dept)}
+      <div
+        className={cn(
+          "rounded-md border border-slate-200 bg-white",
+          n <= 4 ? "w-full max-w-full overflow-x-hidden" : "overflow-x-auto [scrollbar-width:thin]"
+        )}
+      >
+        <div
+          className={cn(
+            "max-h-[70vh] min-h-0 w-full overflow-y-auto [scrollbar-gutter:stable] [scrollbar-width:thin]",
+            n > 4 && "min-w-max"
+          )}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onCellClick(ymd);
+          }}
+        >
+          <div className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+            {hasAnyAllDay && (
+              <div className="grid w-full border-b border-slate-200 bg-slate-50/50" style={{ gridTemplateColumns }}>
+                <div
+                  className="box-border flex min-h-[3rem] items-center justify-center border-r border-slate-200 bg-slate-50/50 px-0.5 py-1"
+                  style={{ width: tw, minWidth: tw, maxWidth: tw }}
                 >
-                  ▼ {DEPT_CONFIG[dept].label}
-                </button>
-                <div className="relative inline-flex h-[4.25rem] items-stretch">
-                  {hours.map((h) => (
-                    <DroppableCell
-                      key={h}
-                      id={`tl-day-${dept}-${ymd}-${h}`}
-                      className="w-11 shrink-0 border-l border-dashed border-muted/60 first:border-l-0"
-                    >
-                      <button
-                        type="button"
-                        className="flex h-full w-full flex-col justify-start pt-0.5 text-center text-[10px] leading-none text-muted-foreground"
-                        onClick={() => onCellClick(ymd)}
-                      >
-                        {h}
-                      </button>
-                    </DroppableCell>
-                  ))}
-                  {deptEvents.map((ev) => {
-                    const sh = ev.startAt.getHours();
-                    const eh = ev.endAt.getHours();
-                    const left = (sh / 24) * 100;
-                    const width = Math.max(((Math.min(eh + 1, 24) - sh) / 24) * 100, 3);
-                    const cfg =
-                      DEPT_CONFIG[(ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG] ?? DEPT_CONFIG.all;
-                    return (
-                      <div
-                        key={`${dept}-${ev.id}`}
-                        className={cn(
-                          "pointer-events-none absolute top-1.5 h-[2.65rem] overflow-hidden rounded border border-white/30 px-1 text-[10px] font-medium leading-tight text-white shadow-sm",
-                          cfg.bg
-                        )}
-                        style={{
-                          left: `calc(${left}% + 2px)`,
-                          width: `calc(${width}% - 4px)`,
-                        }}
-                      >
-                        <span className="line-clamp-2">{ev.title}</span>
-                      </div>
-                    );
-                  })}
+                  <span className="text-[10px] font-medium leading-none text-slate-400">終日</span>
                 </div>
+                {visibleDepts.map((dept, i) => {
+                  const allDay = deptEventsFor(dept).filter((ev) => ev.allDay);
+                  return (
+                    <div
+                      key={`allday-${dept}`}
+                      className={cn("min-h-[3rem] min-w-0 px-2 py-1.5", deptColBorder(i))}
+                    >
+                      <div className="flex flex-wrap gap-1">
+                        {allDay.map((ev) => (
+                          <DraggableEventChip
+                            key={ev.id}
+                            id={`event-${ev.id}`}
+                            className={cn(
+                              getDeptChipClass(ev.scheduleDepartment),
+                              getDeptAccentClass(ev.scheduleDepartment),
+                              "border-l-4 shadow-sm"
+                            )}
+                          >
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEventClick(ev, e);
+                              }}
+                              className="block truncate"
+                            >
+                              {ev.title}
+                            </span>
+                          </DraggableEventChip>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+            <div className="grid w-full bg-muted/30" style={{ gridTemplateColumns }}>
+              <div
+                className="box-border h-9 shrink-0 border-r border-slate-200 bg-muted/30"
+                style={{ width: tw, minWidth: tw, maxWidth: tw }}
+                aria-hidden
+              />
+              {visibleDepts.map((dept, i) => {
+                const DeptFilterIcon = DEPT_FILTER_ICON_COMPONENTS[dept as keyof typeof DEPT_FILTER_ICON_COMPONENTS];
+                return (
+                  <div
+                    key={`hdr-${dept}`}
+                    className={cn(
+                      "flex h-9 min-w-0 items-center justify-center gap-1 px-1 text-center text-xs font-semibold text-slate-800",
+                      deptColBorder(i)
+                    )}
+                  >
+                    <DeptFilterIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                    <span className="min-w-0 truncate">{DEPT_CONFIG[dept].label}</span>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+          <div className="grid w-full shrink-0" style={{ gridTemplateColumns }}>
+            <ScheduleDayTimeLabelsColumn />
+            {visibleDepts.map((dept, i) => {
+              const raw = deptEventsFor(dept);
+              const timed: ScheduleRow[] = [];
+              for (const ev of raw) {
+                if (!ev.allDay && clipTimedSegmentToDay(ev, dayStart, dayEnd)) timed.push(ev);
+              }
+              return (
+                <div key={dept} className={cn("min-w-0", deptColBorder(i))}>
+                  <ScheduleDayTimeGridColumn>
+                    {hours.map((h) => (
+                      <div
+                        key={h}
+                        className="pointer-events-auto absolute right-0 left-0 z-[1]"
+                        style={{ top: h * PIXELS_PER_HOUR, height: PIXELS_PER_HOUR }}
+                      >
+                        <DroppableCell id={`tl-day-${dept}-${ymd}-${h}`} className="h-full w-full">
+                          <div className="h-full w-full" aria-hidden />
+                        </DroppableCell>
+                      </div>
+                    ))}
+                    {timed.map((ev) => {
+                      const seg = clipTimedSegmentToDay(ev, dayStart, dayEnd);
+                      if (!seg) return null;
+                      const { top, height } = segmentLayout(seg, dayStart);
+                      const cfg =
+                        DEPT_CONFIG[(ev.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG] ?? DEPT_CONFIG.all;
+                      return (
+                        <div
+                          key={`${dept}-${ev.id}`}
+                          className="absolute right-1 left-1 z-[2] min-h-0 min-w-0 overflow-hidden"
+                          style={{ top, height }}
+                        >
+                          <DraggableEventChip
+                            id={`event-${ev.id}`}
+                            dense
+                            className={cn(
+                              "h-full min-h-0 w-full flex-col items-stretch justify-start gap-0.5 overflow-hidden py-0.5",
+                              cfg.bg,
+                              "border-white/30 text-white shadow-sm"
+                            )}
+                          >
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEventClick(ev, e);
+                              }}
+                              className="block min-w-0"
+                            >
+                              <span className="block text-[10px] leading-tight opacity-90">
+                                {formatEventTimeLabel(ev)}
+                              </span>
+                              <span className="block truncate text-[11px] leading-tight">{ev.title}</span>
+                            </span>
+                          </DraggableEventChip>
+                        </div>
+                      );
+                    })}
+                  </ScheduleDayTimeGridColumn>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   }

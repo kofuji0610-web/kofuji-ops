@@ -26,9 +26,11 @@ const DEPT_DOT_CLASS: Record<string, string> = {
 };
 
 /** Same scale for both columns (px per hour, 24h = full day). */
-const PIXELS_PER_HOUR = 48;
+export const PIXELS_PER_HOUR = 48;
+/** Left time-axis column width; keep in sync with department day grid `grid-template-columns`. */
+export const SCHEDULE_DAY_TIME_AXIS_WIDTH_PX = 40;
 const DAY_MINUTES = 24 * 60;
-const TIMELINE_HEIGHT_PX = 24 * PIXELS_PER_HOUR;
+export const TIMELINE_HEIGHT_PX = 24 * PIXELS_PER_HOUR;
 const HALF_H = PIXELS_PER_HOUR / 2;
 const MIN_EVENT_PX = 22;
 
@@ -83,16 +85,16 @@ function dotClass(ev: PersonalDayEvent): string {
   return DEPT_DOT_CLASS[sd] ?? DEPT_DOT_CLASS.all;
 }
 
-function startOfLocalDay(d: Date): Date {
+export function startOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 
-function endOfLocalDay(d: Date): Date {
+export function endOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
 }
 
 /** Clip [start,end) to local calendar day of `day`. Returns null if no overlap. */
-function clipTimedSegmentToDay(
+export function clipTimedSegmentToDay(
   ev: PersonalDayEvent,
   dayStart: Date,
   dayEnd: Date
@@ -108,7 +110,7 @@ function clipTimedSegmentToDay(
   return { start: new Date(cs), end: new Date(ce) };
 }
 
-function segmentLayout(
+export function segmentLayout(
   seg: { start: Date; end: Date },
   dayStart: Date
 ): { top: number; height: number } {
@@ -164,6 +166,64 @@ function EventBlock({
   );
 }
 
+/** Left column only (00:00 … 23:00); same geometry as personal day view. */
+export function ScheduleDayTimeLabelsColumn() {
+  return (
+    <div
+      className="relative box-border shrink-0 select-none border-r border-slate-100/90 bg-white"
+      style={{
+        width: SCHEDULE_DAY_TIME_AXIS_WIDTH_PX,
+        minWidth: SCHEDULE_DAY_TIME_AXIS_WIDTH_PX,
+        maxWidth: SCHEDULE_DAY_TIME_AXIS_WIDTH_PX,
+        height: TIMELINE_HEIGHT_PX,
+        minHeight: TIMELINE_HEIGHT_PX,
+      }}
+    >
+      {HOUR_LABELS.map(({ h, top, text }) => (
+        <span
+          key={h}
+          className="absolute left-0 right-0 pr-0.5 text-right font-mono text-[10px] tabular-nums leading-none text-slate-400/90"
+          style={{ top: top + 2 }}
+        >
+          {text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Grid + overlays without the time labels column (for multi-column day layouts). */
+export function ScheduleDayTimeGridColumn({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="relative min-w-0 w-full flex-1 shrink-0 bg-slate-50/35"
+      style={{ height: TIMELINE_HEIGHT_PX, minHeight: TIMELINE_HEIGHT_PX }}
+    >
+      {HALF_HOUR_LINES.map(({ key, top, dashed }) => (
+        <div
+          key={key}
+          className={cn(
+            "pointer-events-none absolute right-0 left-0 z-0 border-b",
+            dashed ? "border-dashed border-slate-200/55" : "border-slate-200/70"
+          )}
+          style={{ top }}
+        />
+      ))}
+      {children}
+    </div>
+  );
+}
+
+/** Hour labels + grid; render timed overlays as children (same geometry as personal day view). */
+export function ScheduleDayTimeAxis({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex w-full min-w-0">
+      <ScheduleDayTimeLabelsColumn />
+      <ScheduleDayTimeGridColumn>{children}</ScheduleDayTimeGridColumn>
+    </div>
+  );
+}
+
 function DayTimeline({
   timed,
   dayStart,
@@ -174,37 +234,11 @@ function DayTimeline({
   onEventClick: (ev: PersonalDayEvent, e: React.MouseEvent) => void;
 }) {
   return (
-    <div className="flex w-full min-w-0">
-      <div
-        className="relative w-10 shrink-0 select-none border-r border-slate-100/90 bg-white"
-        style={{ height: TIMELINE_HEIGHT_PX }}
-      >
-        {HOUR_LABELS.map(({ h, top, text }) => (
-          <span
-            key={h}
-            className="absolute left-0 right-0 pr-0.5 text-right font-mono text-[10px] tabular-nums leading-none text-slate-400/90"
-            style={{ top: top + 2 }}
-          >
-            {text}
-          </span>
-        ))}
-      </div>
-      <div className="relative min-h-0 min-w-0 flex-1 bg-slate-50/35" style={{ height: TIMELINE_HEIGHT_PX }}>
-        {HALF_HOUR_LINES.map(({ key, top, dashed }) => (
-          <div
-            key={key}
-            className={cn(
-              "pointer-events-none absolute right-0 left-0 z-0 border-b",
-              dashed ? "border-dashed border-slate-200/55" : "border-slate-200/70"
-            )}
-            style={{ top }}
-          />
-        ))}
-        {timed.map((ev) => (
-          <EventBlock key={ev.id} ev={ev} dayStart={dayStart} onEventClick={onEventClick} />
-        ))}
-      </div>
-    </div>
+    <ScheduleDayTimeAxis>
+      {timed.map((ev) => (
+        <EventBlock key={ev.id} ev={ev} dayStart={dayStart} onEventClick={onEventClick} />
+      ))}
+    </ScheduleDayTimeAxis>
   );
 }
 
