@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { Wrench, Paintbrush, Scissors, Plane } from "lucide-react";
 
 /** スケジュール画面「全体共有 × 日表示」用（TimelineView とは別経路で組み込み予定） */
 const BUSINESS_DEPT_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
@@ -10,6 +11,20 @@ const DEPT_LABEL_JA: Record<BusinessDeptKey, string> = {
   slitter: "スリッター",
   drone: "ドローン",
 };
+
+const DEPT_ICON_MAP = {
+  maintenance: Wrench,
+  painting: Paintbrush,
+  slitter: Scissors,
+  drone: Plane,
+} as const;
+
+const DEPT_COLOR_MAP = {
+  maintenance: "#60A5FA",
+  painting: "#4ADE80",
+  slitter: "#FCD34D",
+  drone: "#A78BFA",
+} as const;
 
 /** 「all」は先頭部署（整備）行にのみ表示（既存 TimelineView 日表示の扱いに合わせる） */
 const ALL_DEPT_FALLBACK: BusinessDeptKey = BUSINESS_DEPT_KEYS[0];
@@ -131,8 +146,12 @@ export function OverallDayMatrixView({
 
   const rows: MatrixRow[] = useMemo(() => {
     const out: MatrixRow[] = [];
+    // 1. 部署行を全部先に並べる
     for (const key of visibleDeptKeys) {
       out.push({ kind: "dept", key });
+    }
+    // 2. メンバーを部署順に並べる（複数部署メンバーは各部署で重複表示）
+    for (const key of visibleDeptKeys) {
       const inDept = members.filter((m) => parseMemberDeptKeys(m.department).includes(key));
       for (const member of inDept) {
         out.push({ kind: "member", key, member });
@@ -175,9 +194,27 @@ export function OverallDayMatrixView({
           const rowEvents = eventsForRow(row);
           const label =
             row.kind === "member" ? (
-              <span className="pl-3 text-slate-700">{labelForRow(row)}</span>
+              <span className="flex items-center gap-1.5 pl-3 text-slate-700">
+                {(() => {
+                  const Icon = DEPT_ICON_MAP[row.key];
+                  return <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />;
+                })()}
+                {labelForRow(row)}
+              </span>
             ) : (
-              <span className="font-semibold text-slate-800">{labelForRow(row)}</span>
+              <span className="flex items-center gap-2 font-semibold text-slate-800">
+                {(() => {
+                  const Icon = DEPT_ICON_MAP[row.key];
+                  return (
+                    <Icon
+                      className="h-4 w-4 shrink-0"
+                      style={{ color: DEPT_COLOR_MAP[row.key] }}
+                      aria-hidden
+                    />
+                  );
+                })()}
+                {labelForRow(row)}
+              </span>
             );
 
           return (
