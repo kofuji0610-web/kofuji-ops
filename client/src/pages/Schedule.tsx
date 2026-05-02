@@ -50,6 +50,7 @@ import {
 import { canEditScheduleOf } from "@/utils/schedulePermission";
 import { OverallDayMatrixView } from "@/components/schedule/OverallDayMatrixView";
 import { OverallWeekMatrixView } from "@/components/schedule/OverallWeekMatrixView";
+import { OverallMonthMatrixView } from "@/components/schedule/OverallMonthMatrixView";
 
 // ─── 定数（全タブ共通） ───────────────────────────────────────────────────────
 
@@ -1352,6 +1353,10 @@ function CalendarTab() {
   const y = currentDate.getFullYear();
   const mo = currentDate.getMonth();
   const monthGrid = useMemo(() => getMonthGridDates(y, mo), [y, mo]);
+  const monthDaysInterval = useMemo(
+    () => eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) }),
+    [currentDate]
+  );
   const weekDays = useMemo(() => {
     const sun = startOfWeekSunday(currentDate);
     return Array.from({ length: 7 }, (_, i) => addDays(sun, i));
@@ -1694,25 +1699,43 @@ function CalendarTab() {
               deptWeekFill ? "overflow-x-hidden" : "overflow-x-auto"
             )}
           >
-            {view === "month" && (
-              <MonthGridView
-                month={mo}
-                cells={monthGrid}
-                density={density}
-                scheduleScope={scheduleScope}
-                eventsForDay={eventsForDay}
-                onCellClick={openCreateForDay}
-                onDaySelect={(ymd) => setSelectedYmd(ymd)}
-                selectedYmd={selectedYmd}
-                onMoreClick={(ymd) => setDayListYmd(ymd)}
-                onEventClick={(ev, e) => {
-                  if (isDraggingRef.current) return;
-                  setSelectedEvent(ev);
-                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                  setShowEventPanel(true);
-                }}
-              />
-            )}
+            {view === "month" &&
+              (scheduleScope === "overall" ? (
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <OverallMonthMatrixView
+                    schedules={filteredSchedules}
+                    monthDays={monthDaysInterval}
+                    members={
+                      members as unknown as import("@/components/schedule/OverallWeekMatrixView").OverallWeekMatrixMember[]
+                    }
+                    activeDepts={activeDepts}
+                    onEventClick={(ev, e) => {
+                      if (isDraggingRef.current) return;
+                      setSelectedEvent(ev as ScheduleRow);
+                      setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                      setShowEventPanel(true);
+                    }}
+                  />
+                </div>
+              ) : (
+                <MonthGridView
+                  month={mo}
+                  cells={monthGrid}
+                  density={density}
+                  scheduleScope={scheduleScope}
+                  eventsForDay={eventsForDay}
+                  onCellClick={openCreateForDay}
+                  onDaySelect={(ymd) => setSelectedYmd(ymd)}
+                  selectedYmd={selectedYmd}
+                  onMoreClick={(ymd) => setDayListYmd(ymd)}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
+              ))}
             {view === "week" &&
               (scheduleScope === "personal" && user ? (
                 <PersonalWeekCompareView
