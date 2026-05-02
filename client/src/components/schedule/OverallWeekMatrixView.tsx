@@ -34,11 +34,8 @@ function isHolidayOrSunday(d: Date): boolean {
 }
 
 function getHolidayName(d: Date): string | null {
-  const holiday = holidayJp.isHoliday(d) as unknown;
-  if (!holiday || typeof holiday !== "object") return null;
-  if (!("name" in holiday)) return null;
-  const name = (holiday as { name?: unknown }).name;
-  return typeof name === "string" ? name : null;
+  const found = holidayJp.between(d, d);
+  return found[0]?.name ?? null;
 }
 
 function isSaturday(d: Date): boolean {
