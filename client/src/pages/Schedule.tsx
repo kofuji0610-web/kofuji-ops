@@ -49,6 +49,7 @@ import {
 } from "@/components/schedule/PersonalDayView";
 import { canEditScheduleOf } from "@/utils/schedulePermission";
 import { OverallDayMatrixView } from "@/components/schedule/OverallDayMatrixView";
+import { OverallWeekMatrixView } from "@/components/schedule/OverallWeekMatrixView";
 
 // ─── 定数（全タブ共通） ───────────────────────────────────────────────────────
 
@@ -1750,6 +1751,21 @@ function CalendarTab() {
                     }}
                   />
                 </div>
+              ) : scheduleScope === "overall" ? (
+                <OverallWeekMatrixView
+                  schedules={filteredSchedules}
+                  weekDays={weekDays}
+                  members={
+                    members as unknown as import("@/components/schedule/OverallWeekMatrixView").OverallWeekMatrixMember[]
+                  }
+                  activeDepts={activeDepts}
+                  onEventClick={(ev, e) => {
+                    if (isDraggingRef.current) return;
+                    setSelectedEvent(ev as ScheduleRow);
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                    setShowEventPanel(true);
+                  }}
+                />
               ) : (
                 <WeekMemberMatrixView
                   weekDays={weekDays}
