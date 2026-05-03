@@ -1599,9 +1599,11 @@ function CalendarTab() {
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground shrink-0">
         <Badge variant="outline">表示予定: {filteredSchedules.length}件</Badge>
         <Badge variant="outline">部署: {activeDepts.size}/{BUSINESS_DEPT_KEYS.length}</Badge>
-        <Badge variant="outline">
-          メンバー: {selectedMemberIds.size === 0 ? "全員" : `${selectedMemberIds.size}名選択`}
-        </Badge>
+        {scheduleScope === "overall" && (
+          <Badge variant="outline">
+            メンバー: {selectedMemberIds.size === 0 ? "全員" : `${selectedMemberIds.size}名選択`}
+          </Badge>
+        )}
       </div>
 
       <div className={cn("flex min-h-0 flex-col", deptWeekFill && "flex-1 min-h-0")}>
@@ -1681,57 +1683,59 @@ function CalendarTab() {
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-                <p className="shrink-0 rounded-md border border-slate-200/80 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
-                  メンバー
-                </p>
-                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
-                  {members.map((m) => {
-                    const memberOn = selectedMemberIds.has(m.id);
-                    const firstBizDept = parseUserBusinessDeptKeys(m.department ?? null)[0] as
-                      | keyof typeof DEPT_CONFIG
-                      | undefined;
-                    const deptHex =
-                      (firstBizDept && DEPT_CONFIG[firstBizDept]
-                        ? DEPT_CONFIG[firstBizDept].color
-                        : undefined) ?? DEPT_CONFIG.all.color;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        aria-pressed={memberOn}
-                        onClick={() =>
-                          setSelectedMemberIds((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(m.id)) n.delete(m.id);
-                            else n.add(m.id);
-                            return n;
-                          })
-                        }
-                        className={cn(
-                          "flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
-                          memberOn ? "font-semibold shadow-md" : "shadow-sm hover:brightness-[0.97]"
-                        )}
-                        style={{
-                          backgroundColor: memberOn ? `${deptHex}48` : `${deptHex}22`,
-                          border: memberOn
-                            ? `1px solid ${deptHex}9E`
-                            : `1px solid ${deptHex}52`,
-                          boxShadow: memberOn ? "0 1px 4px rgba(15, 23, 42, 0.07)" : undefined,
-                        }}
-                      >
-                        <span
-                          className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.65)]"
-                          aria-hidden
+              {scheduleScope === "overall" && (
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                  <p className="shrink-0 rounded-md border border-slate-200/80 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                    メンバー
+                  </p>
+                  <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
+                    {members.map((m) => {
+                      const memberOn = selectedMemberIds.has(m.id);
+                      const firstBizDept = parseUserBusinessDeptKeys(m.department ?? null)[0] as
+                        | keyof typeof DEPT_CONFIG
+                        | undefined;
+                      const deptHex =
+                        (firstBizDept && DEPT_CONFIG[firstBizDept]
+                          ? DEPT_CONFIG[firstBizDept].color
+                          : undefined) ?? DEPT_CONFIG.all.color;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          aria-pressed={memberOn}
+                          onClick={() =>
+                            setSelectedMemberIds((prev) => {
+                              const n = new Set(prev);
+                              if (n.has(m.id)) n.delete(m.id);
+                              else n.add(m.id);
+                              return n;
+                            })
+                          }
+                          className={cn(
+                            "flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left text-[10px] font-medium text-slate-700 transition-[filter,box-shadow]",
+                            memberOn ? "font-semibold shadow-md" : "shadow-sm hover:brightness-[0.97]"
+                          )}
+                          style={{
+                            backgroundColor: memberOn ? `${deptHex}48` : `${deptHex}22`,
+                            border: memberOn
+                              ? `1px solid ${deptHex}9E`
+                              : `1px solid ${deptHex}52`,
+                            boxShadow: memberOn ? "0 1px 4px rgba(15, 23, 42, 0.07)" : undefined,
+                          }}
                         >
-                          <UserCircle className="h-3 w-3 text-slate-500" aria-hidden />
-                        </span>
-                        <span className="min-w-0 truncate">{m.displayName ?? m.name}</span>
-                      </button>
-                    );
-                  })}
+                          <span
+                            className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.65)]"
+                            aria-hidden
+                          >
+                            <UserCircle className="h-3 w-3 text-slate-500" aria-hidden />
+                          </span>
+                          <span className="min-w-0 truncate">{m.displayName ?? m.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
           </>
@@ -1783,13 +1787,8 @@ function CalendarTab() {
               (scheduleScope === "personal" && user ? (
                 <PersonalWeekCompareView
                   weekDays={weekDays}
-                  user={{ id: user.id, department: user.department }}
-                  viewerRole={user.role ?? "user"}
-                  schedules={schedules}
                   filteredSchedules={filteredSchedules}
                   density={density}
-                  activeDepts={activeDepts}
-                  selectedMemberIds={selectedMemberIds}
                   onCellClick={openCreateForDay}
                   onEventClick={(ev, e) => {
                     if (isDraggingRef.current) return;
@@ -2303,34 +2302,20 @@ function MonthGridView({
 
 function PersonalWeekCompareView({
   weekDays,
-  user,
-  viewerRole,
-  schedules,
   filteredSchedules,
   density,
-  activeDepts,
-  selectedMemberIds,
   onCellClick,
   onEventClick,
 }: {
   weekDays: Date[];
-  user: { id: number; department: string | null };
-  viewerRole: string;
-  schedules: ScheduleRow[];
   filteredSchedules: ScheduleRow[];
   density: "comfortable" | "compact";
-  activeDepts: Set<string>;
-  selectedMemberIds: Set<number>;
   onCellClick: (ymd: string) => void;
   onEventClick: (ev: ScheduleRow, e: React.MouseEvent) => void;
 }) {
   const todayYmd = formatYmd(new Date());
   const cellMinHeight = density === "compact" ? "min-h-[86px]" : "min-h-[112px]";
   const visibleCount = density === "compact" ? 3 : 2;
-
-  const userDeptKeys = useMemo(() => parseUserBusinessDeptKeys(user.department), [user.department]);
-  const userDeptSet = useMemo(() => new Set(userDeptKeys), [userDeptKeys]);
-  const managerBroadDeptColumn = viewerRole === "manager" && userDeptKeys.length === 0;
 
   return (
     <div className="min-w-[min(100%,720px)]">
