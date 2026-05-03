@@ -2335,25 +2335,12 @@ function PersonalWeekCompareView({
           const sat = isSaturday(d);
           const isToday = ymd === todayYmd;
 
-          const deptList = schedules
+          const deptList = filteredSchedules
             .filter((ev) => {
               const ds = formatYmd(ev.startAt);
               const de = formatYmd(ev.endAt);
               if (ds > ymd || de < ymd) return false;
-              const st = (ev.scheduleType ?? "").toLowerCase();
-              const sdRaw = ev.scheduleDepartment ?? "all";
-              if (st === "personal" || sdRaw === "personal") return false;
-              const dept = sdRaw as keyof typeof DEPT_CONFIG;
-              const dk = DEPT_CONFIG[dept] ? dept : "all";
-              if (dk !== "personal" && dk !== "all" && !activeDepts.has(dk as string)) return false;
-              if (selectedMemberIds.size > 0 && !selectedMemberIds.has(ev.userId)) return false;
-              if (userDeptKeys.length === 0) {
-                if (!managerBroadDeptColumn) return false;
-                if (sdRaw === "all") return false;
-                return isBusinessDeptKey(sdRaw);
-              }
-              if (sdRaw === "all") return true;
-              return userDeptSet.has(sdRaw);
+              return !isPersonalKindSchedule(ev);
             })
             .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
@@ -2361,7 +2348,8 @@ function PersonalWeekCompareView({
             .filter((ev) => {
               const ds = formatYmd(ev.startAt);
               const de = formatYmd(ev.endAt);
-              return ds <= ymd && ymd <= de;
+              if (ds > ymd || de < ymd) return false;
+              return isPersonalKindSchedule(ev);
             })
             .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
