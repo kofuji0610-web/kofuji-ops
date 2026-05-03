@@ -283,6 +283,36 @@ type ScheduleRow = {
 
 const DEPT_SCOPE_KEYS = ["maintenance", "painting", "slitter", "drone"] as const;
 
+function isPersonalKindSchedule(s: ScheduleRow): boolean {
+  const st = (s.scheduleType ?? "").toLowerCase();
+  const sd = s.scheduleDepartment ?? "all";
+  return st === "personal" || sd === "personal";
+}
+
+/** 個人タブ: 所属部署の予定 + 自分の個人予定（ログインユーザー基準） */
+function matchesPersonalTabScope(
+  s: ScheduleRow,
+  user: { id: number; department: string | null },
+  viewerRole: string
+): boolean {
+  if (isPersonalKindSchedule(s)) {
+    return s.userId === user.id;
+  }
+
+  const sdRaw = s.scheduleDepartment ?? "all";
+  const userDeptKeys = parseUserBusinessDeptKeys(user.department);
+  const userDeptSet = new Set(userDeptKeys);
+  const managerBroadDeptColumn = viewerRole === "manager" && userDeptKeys.length === 0;
+
+  if (userDeptKeys.length === 0) {
+    if (!managerBroadDeptColumn) return false;
+    if (sdRaw === "all") return false;
+    return isBusinessDeptKey(sdRaw);
+  }
+  if (sdRaw === "all") return true;
+  return userDeptSet.has(sdRaw);
+}
+
 function matchesScheduleScope(s: ScheduleRow, scope: ScheduleScopeTab): boolean {
   const st = (s.scheduleType ?? "").toLowerCase();
   const sd = s.scheduleDepartment ?? "all";
@@ -1207,14 +1237,27 @@ function CalendarTab() {
 
   const filteredSchedules = useMemo(() => {
     return schedules.filter((s) => {
-      if (!matchesScheduleScope(s, scheduleScope)) return false;
+      if (scheduleScope === "personal") {
+        if (!user) return false;
+        if (!matchesPersonalTabScope(s, user, user.role ?? "user")) return false;
+      } else if (!matchesScheduleScope(s, scheduleScope)) {
+        return false;
+      }
+
       const dept = (s.scheduleDepartment ?? "all") as keyof typeof DEPT_CONFIG;
       const dk = DEPT_CONFIG[dept] ? dept : "all";
       if (dk !== "personal" && dk !== "all" && !activeDepts.has(dk)) return false;
-      if (selectedMemberIds.size > 0 && !selectedMemberIds.has(s.userId)) return false;
+
+      if (
+        scheduleScope === "overall" &&
+        selectedMemberIds.size > 0 &&
+        !selectedMemberIds.has(s.userId)
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [schedules, scheduleScope, activeDepts, selectedMemberIds]);
+  }, [schedules, scheduleScope, activeDepts, selectedMemberIds, user]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
